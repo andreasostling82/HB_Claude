@@ -1,0 +1,44 @@
+@page
+@model HB_Claude.Pages.NyaMatcherModel
+@{
+    ViewData["Title"] = "Ny match";
+    Layout = "_Layout";
+}
+
+<div class="row justify-content-center mt-4">
+    <div class="col-md-5">
+        <h4>Skapa ny match</h4>
+        @if (!string.IsNullOrEmpty(Model.Meddelande))
+        {
+            <div class="alert alert-danger">@Model.Meddelande</div>
+        }
+        <form method="post">
+            <div class="mb-2">
+                <label class="form-label">Lag</label>
+                <select asp-for="ValtLagID" class="form-select">
+                    <option value="">Välj lag</option>
+                    @foreach (var l in Model.LagLista)
+                    {
+                        <option value="@l.LagID">@l.Namn</option>
+                    }
+                </select>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Datum (YYYY-MM-DD)</label>
+                <input asp-for="Datum" type="date" class="form-control" value="@DateTime.Now.AddDays(7).ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Motståndare</label>
+                <input asp-for="Motståndare" class="form-control" placeholder="Motståndarlagets namn" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Plats</label>
+                <input asp-for="Plats" class="form-control" placeholder="Spelplats" />
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Skapa match</button>
+                <a asp-page="/Events" class="btn btn-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>

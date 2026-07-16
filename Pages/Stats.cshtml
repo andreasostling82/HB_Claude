@@ -1,0 +1,214 @@
+@page
+@model HB_Claude.Pages.StatsModel
+@using HB_Claude.Models
+@{
+    ViewData["Title"] = "Statistik";
+    Layout = "_Layout";
+}
+
+<h4>Matchstatistik</h4>
+
+<form method="post" id="statsForm">
+
+    <div class="row g-2 mb-3">
+        <div class="col-md-3">
+            <label class="form-label form-label-sm">Lag</label>
+            <select asp-for="ValtLagID" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Välj lag</option>
+                @foreach (var l in Model.LagLista)
+                {
+                    <option value="@l.LagID" selected="@(l.LagID == Model.ValtLagID ? "selected" : null)">@l.Namn</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label form-label-sm">Match (avslutade)</label>
+            <select asp-for="ValtMatchID" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Välj match</option>
+                @foreach (var m in Model.MatchLista)
+                {
+                    <option value="@m.MatchID" selected="@(m.MatchID == Model.ValtMatchID ? "selected" : null)">@m.Titel</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label form-label-sm">Spelare</label>
+            <select asp-for="ValtSpelarID" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="0">Alla spelare</option>
+                @foreach (var s in Model.SpelareLista)
+                {
+                    <option value="@s.SpID" selected="@(s.SpID == Model.ValtSpelarID ? "selected" : null)">@s.Namn</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            @if (!string.IsNullOrEmpty(Model.ValtMatchID))
+            {
+                <button type="submit" asp-page-handler="Export" class="btn btn-sm btn-outline-success">Exportera CSV</button>
+            }
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+@if (Model.SammanfattningLista.Any() && (Model.ValtSpelarID == "0" || string.IsNullOrEmpty(Model.ValtSpelarID)))
+{
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+    (function () {
+        var labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.SammanfattningLista.Select(s => s.namn).ToList()));
+        var goals  = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.SammanfattningLista.Select(s => int.TryParse(s.Mål, out var g) ? g : 0).ToList()));
+        var shots  = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.SammanfattningLista.Select(s => int.TryParse(s.Avslut, out var a) ? a : 0).ToList()));
+
+        new Chart(document.getElementById('goalChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Mål',
+                        data: goals,
+                        backgroundColor: 'rgba(25, 135, 84, 0.8)',
+                        borderColor: 'rgba(25, 135, 84, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Avslut',
+                        data: shots,
+                        backgroundColor: 'rgba(255, 193, 7, 0.6)',
+                        borderColor: 'rgba(255, 193, 7, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+    })();
+    </script>
+}
+}
+
+@if (!string.IsNullOrEmpty(Model.ValtMatchID))
+{
+    <!-- Målgraf -->
+    @if (Model.SammanfattningLista.Any() && (Model.ValtSpelarID == "0" || string.IsNullOrEmpty(Model.ValtSpelarID)))
+    {
+        <h6 class="mt-3">Mål per spelare</h6>
+        <div class="mb-3" style="max-width: 800px;">
+            <canvas id="goalChart" style="max-height: 280px;"></canvas>
+        </div>
+    }
+
+    <!-- Sammanfattning -->
+    @if (Model.SammanfattningLista.Any())
+    {
+        <h6 class="mt-3">Sammanfattning per spelare</h6>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-striped small">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Spelare</th>
+                        <th>Position</th>
+                        <th>Mål</th>
+                        <th>Avslut</th>
+                        <th>Mål/Avslut</th>
+                        <th>T.Fel</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model.SammanfattningLista)
+                    {
+                        <tr>
+                            <td>@s.namn</td>
+                            <td>@s.Position</td>
+                            <td>@s.Mål</td>
+                            <td>@s.Avslut</td>
+                            <td>@s.Målperavslut</td>
+                            <td>@s.TekniskaFel</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <!-- Målvakter -->
+    @if (Model.MalvaktLista.Any())
+    {
+        <h6>Målvakter</h6>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-striped small">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Målvakt</th>
+                        <th>Räddningar</th>
+                        <th>%</th>
+                        <th>Insläppta</th>
+                        <th>Tekniska fel</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in Model.MalvaktLista)
+                    {
+                        <tr>
+                            <td>@m.Namn</td>
+                            <td>@m.Raddningar</td>
+                            <td>@(double.TryParse(m.Procent, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var pct) ? $"{pct * 100:0.0} %" : m.Procent)</td>
+                            <td>@m.Mål</td>
+                            <td>@m.Fel</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <!-- Detaljhändelser -->
+    @if (Model.HändelserLista.Any())
+    {
+        <h6>Händelsedetaljer</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-hover small">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Tid</th>
+                        <th>Spelare</th>
+                        <th>Händelse</th>
+                        <th>T.Fel</th>
+                        <th>Zon</th>
+                        <th>Mål</th>
+                        <th>Avslut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var h in Model.HändelserLista)
+                    {
+                        <tr>
+                            <td>@h.Tid</td>
+                            <td>@h.Namn</td>
+                            <td>@h.Händelse</td>
+                            <td>@(h.TeknisktFel == "1" ? "X" : "")</td>
+                            <td>@h.Zon</td>
+                            <td>@(h.Mål == "1" ? "X" : "")</td>
+                            <td>@(h.Avslut == "1" ? "X" : "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}

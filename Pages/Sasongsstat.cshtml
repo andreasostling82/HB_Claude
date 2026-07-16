@@ -1,0 +1,271 @@
+@page
+@model HB_Claude.Pages.SasongsstatModel
+@{
+    ViewData["Title"] = "Säsongsstatistik";
+    Layout = "_Layout";
+    var skorare = Model.Spelare.Where(s => s.Mål > 0).ToList();
+}
+
+<style>
+  .stat-card {
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 1.2rem 1.4rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  }
+  .stat-num {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--red);
+    line-height: 1.1;
+  }
+  .stat-lbl {
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .section-title {
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: .85rem;
+  }
+  .mm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .875rem;
+  }
+  .mm-table th {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-weight: 700;
+    padding: .45rem .75rem;
+    border-bottom: 2px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+  }
+  .mm-table td {
+    padding: .5rem .75rem;
+    border-bottom: 1px solid var(--border2);
+    color: var(--text);
+  }
+  .mm-table tr:last-child td { border-bottom: none; }
+  .mm-table tbody tr:hover td { background: var(--surface2); }
+  .mm-table td.num, .mm-table th.num { text-align: center; }
+  .badge-pos {
+    font-size: .65rem;
+    padding: .15rem .5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: .3px;
+  }
+  .badge-mv  { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-bd); }
+  .badge-bk  { background: var(--green-bg); color: var(--green); border: 1px solid #b3e8ce; }
+  .badge-ut  { background: #eef3fb; color: #2b5bbf; border: 1px solid #bed0f5; }
+  .row-top td { background: var(--red-bg) !important; }
+  .row-top td:nth-child(2) { font-weight: 600; }
+  .col-rank { width: 30px; color: var(--muted); font-size: .8rem; text-align: center; }
+  .col-mål  { font-weight: 600; color: var(--red); }
+  .col-mål-zero { color: var(--muted); }
+  .spelare-link { color: var(--text); text-decoration: none; font-weight: 500; }
+  .spelare-link:hover { color: var(--red); text-decoration: underline; }
+  .empty-state {
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 3rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: .9rem;
+  }
+</style>
+
+<div style="max-width:980px; margin:0 auto; padding:0 1rem 3rem;">
+
+  <!-- Rubrik + lagväljare -->
+  <form method="post" class="mb-4 d-flex align-items-center gap-3 flex-wrap">
+    <h4 class="mb-0 fw-bold" style="color:var(--text)">Säsongsstatistik</h4>
+    <select asp-for="ValtLagID" class="form-select form-select-sm"
+            style="max-width:220px; border-color:var(--border); background:var(--surface); color:var(--text)"
+            onchange="this.form.submit()">
+      <option value="">Välj lag</option>
+      @foreach (var l in Model.LagLista)
+      {
+        <option value="@l.LagID" selected="@(l.LagID == Model.ValtLagID ? "selected" : null)">@l.Namn</option>
+      }
+    </select>
+  </form>
+
+  @if (!string.IsNullOrEmpty(Model.ValtLagID))
+  {
+    @if (!Model.AntalMatcher.Any())
+    {
+      <div class="empty-state">Inga avslutade matcher för säsongen.</div>
+    }
+    else
+    {
+      <!-- Summakort -->
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num">@Model.AntalMatcher.Count</div>
+            <div class="stat-lbl">Matcher spelade</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num">@Model.TotaltMal</div>
+            <div class="stat-lbl">Totalt mål</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num">@(Model.AntalMatcher.Count > 0 ? (Model.TotaltMal / (double)Model.AntalMatcher.Count).ToString("0.0") : "0")</div>
+            <div class="stat-lbl">Mål per match</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num" style="font-size:1.1rem; padding-top:.35rem; color:var(--text)">
+              @(Model.Spelare.FirstOrDefault()?.Namn.Split(' ').LastOrDefault() ?? "-")
+            </div>
+            <div class="stat-lbl">Toppskytt &middot; @(Model.Spelare.FirstOrDefault()?.Mål ?? 0) mål</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Målgraf -->
+      @if (skorare.Any())
+      {
+        <div class="stat-card mb-4">
+          <div class="section-title">Målskytt&shy;ar</div>
+          <div style="max-height:240px;">
+            <canvas id="goalChart"></canvas>
+          </div>
+        </div>
+      }
+
+      <!-- Fältspelartabell -->
+      @if (Model.Spelare.Any())
+      {
+        <div class="stat-card mb-4">
+          <div class="section-title">Fältspelare</div>
+          <div class="table-responsive">
+            <table class="mm-table">
+              <thead>
+                <tr>
+                  <th class="col-rank">#</th>
+                  <th>Spelare</th>
+                  <th class="num">Pos</th>
+                  <th class="num" title="Antal matcher">M</th>
+                  <th class="num">Mål</th>
+                  <th class="num">Avslut</th>
+                  <th class="num" title="Mål per avslut">Mål/A</th>
+                  <th class="num" title="Tekniska fel">T.Fel</th>
+                </tr>
+              </thead>
+              <tbody>
+                @{ int rank = 1; }
+                @foreach (var s in Model.Spelare)
+                {
+                  <tr class="@(rank == 1 ? "row-top" : "")">
+                    <td class="col-rank">@rank</td>
+                    <td><a asp-page="/Spelare" asp-route-namn="@s.Namn" class="spelare-link">@s.Namn</a></td>
+                    <td class="num">
+                      @{
+                        var posClass = s.Position == "MV" ? "badge-mv" : s.Position == "BK" ? "badge-bk" : "badge-ut";
+                      }
+                      <span class="badge-pos @posClass">@s.Position</span>
+                    </td>
+                    <td class="num" style="color:var(--muted)">@s.Matcher</td>
+                    <td class="num @(s.Mål > 0 ? "col-mål" : "col-mål-zero")">@s.Mål</td>
+                    <td class="num">@s.Avslut</td>
+                    <td class="num" style="color:var(--text2)">@s.MålPerAvslut</td>
+                    <td class="num" style="color:@(s.TekniskaFel > 0 ? "var(--warn)" : "var(--muted)")">
+                      @(s.TekniskaFel > 0 ? s.TekniskaFel.ToString() : "")
+                    </td>
+                  </tr>
+                  rank++;
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- Målvaktstabell -->
+      @if (Model.Malvakter.Any())
+      {
+        <div class="stat-card">
+          <div class="section-title">Målvakter</div>
+          <div class="table-responsive">
+            <table class="mm-table">
+              <thead>
+                <tr>
+                  <th>Målvakt</th>
+                  <th class="num" title="Antal matcher">M</th>
+                  <th class="num">Räddningar</th>
+                  <th class="num">Insläppta</th>
+                  <th class="num">Räddnings-%</th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach (var mv in Model.Malvakter)
+                {
+                  <tr>
+                    <td><a asp-page="/Spelare" asp-route-namn="@mv.Namn" class="spelare-link">@mv.Namn</a></td>
+                    <td class="num" style="color:var(--muted)">@mv.Matcher</td>
+                    <td class="num" style="font-weight:600; color:var(--green)">@mv.Räddningar</td>
+                    <td class="num" style="color:var(--warn)">@mv.InsläpptaMål</td>
+                    <td class="num" style="font-weight:600">@mv.Procent</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    }
+  }
+</div>
+
+@section Scripts {
+  @if (skorare.Any())
+  {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+    (function () {
+      var labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(skorare.Select(s => s.Namn).ToList()));
+      var goals  = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(skorare.Select(s => s.Mål).ToList()));
+      new Chart(document.getElementById('goalChart'), {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: goals,
+            backgroundColor: 'rgba(200,40,42,0.75)',
+            borderColor: 'rgba(200,40,42,1)',
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#e4dfd7' } },
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+          }
+        }
+      });
+    })();
+    </script>
+  }
+}

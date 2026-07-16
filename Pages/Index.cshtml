@@ -1,0 +1,40 @@
+@page
+@model HB_Claude.Pages.IndexModel
+@{
+    ViewData["Title"] = "Logga in";
+    Layout = "_Layout";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">MatchMate</h3>
+                <form method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+                    @if (!string.IsNullOrEmpty(Model.Felmeddelande))
+                    {
+                        <div class="alert alert-danger">@Model.Felmeddelande</div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label">E-post</label>
+                        <input asp-for="Epost" class="form-control" placeholder="E-postadress" autocomplete="username" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Lösenord</label>
+                        <input asp-for="Lösenord" type="password" class="form-control" placeholder="Lösenord" autocomplete="current-password" />
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" name="action" value="events" class="btn btn-primary">Matchhändelser</button>
+                        <button type="submit" name="action" value="lagbygge" class="btn btn-secondary">Lagbygge</button>
+                        <button type="submit" name="action" value="stats" class="btn btn-info">Statistik</button>
+                    </div>
+                    <div class="mt-3 d-flex justify-content-between">
+                        <a asp-page="/Registrering">Registrera konto</a>
+                        <a asp-page="/Glomt">Glömt lösenord?</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

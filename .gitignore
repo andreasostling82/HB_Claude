@@ -1,0 +1,14 @@
+# Hemligheter – ska aldrig checkas in
+*.local.md
+*.local.json
+SECRETS.local.md
+appsettings.json
+# .NET build-output
+bin/
+obj/
+.vs/
+# Visual Studio user-specifika filer
+*.user
+# Skräpfiler
+*.stackdump
+New Textdokument.txt

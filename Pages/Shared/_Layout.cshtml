@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>@ViewData["Title"] - MatchMate</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/HB_Claude.styles.css" asp-append-version="true" />
+</head>
+<body style="background-color: var(--bg); color: var(--text)">
+    @if (Context.Session.GetString("user") != null)
+    {
+        <nav class="navbar navbar-expand-sm mb-3" style="background: var(--surface); border-bottom: 3px solid var(--red); box-shadow: 0 2px 8px rgba(0,0,0,.07)">
+            <div class="container-fluid">
+                <a class="navbar-brand fw-bold" asp-page="/Events" style="color: var(--text)">MatchMate</a>
+                <div class="navbar-nav flex-row gap-3">
+                    <a class="nav-link" asp-page="/Events" style="color: var(--text2)">Matchhändelser</a>
+                    <a class="nav-link" asp-page="/Lagbygge" style="color: var(--text2)">Lagbygge</a>
+                    <a class="nav-link" asp-page="/Stats" style="color: var(--text2)">Matchstatistik</a>
+                    <a class="nav-link" asp-page="/Sasongsstat" style="color: var(--text2)">Säsong</a>
+                    <a class="nav-link" asp-page="/Logout" style="color: var(--red)">Logga ut</a>
+                </div>
+            </div>
+        </nav>
+    }
+    <div class="container-fluid">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,52 @@
+:root {
+  --bg: #f2efe9;
+  --surface: #fff;
+  --surface2: #f8f5f0;
+  --border: #e4dfd7;
+  --border2: #ece8e1;
+  --red: #c8282a;
+  --red-bg: #fff4f4;
+  --red-bd: #f5c5c5;
+  --gold: #9a6e00;
+  --gold-bg: #fdf8ec;
+  --gold-bd: #e0c97a;
+  --text: #191920;
+  --text2: #505568;
+  --muted: #8c919e;
+  --green: #187a42;
+  --green-bg: #edfaf2;
+  --warn: #c0392b;
+  --warn-bg: #fef1f0;
+}
+
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+}
+
+.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+  color: var(--bs-secondary-color);
+  text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+  text-align: start;
+}

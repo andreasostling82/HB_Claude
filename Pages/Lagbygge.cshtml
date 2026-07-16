@@ -1,0 +1,152 @@
+@page
+@model HB_Claude.Pages.LagbyggeModel
+@using HB_Claude.Models
+@{
+    ViewData["Title"] = "Lagbygge";
+    Layout = "_Layout";
+}
+
+<div class="row">
+    <!-- Vänster: Lag -->
+    <div class="col-md-4">
+        <h5>Laghantering</h5>
+
+        @if (!string.IsNullOrEmpty(Model.Meddelande))
+        {
+            <div class="alert alert-info py-1 small">@Model.Meddelande</div>
+        }
+
+        <form method="post" id="lagForm">
+            <div class="mb-2">
+                <label class="form-label form-label-sm">Lag</label>
+                <select asp-for="ValtLagID" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">Välj lag</option>
+                    @foreach (var l in Model.LagLista)
+                    {
+                        <option value="@l.LagID">@l.Namn</option>
+                    }
+                </select>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.ValtLagID))
+            {
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Lagnamn</label>
+                    <input asp-for="LagNamn" class="form-control form-control-sm" />
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Hemmaplan</label>
+                    <input asp-for="HemmaHall" class="form-control form-control-sm" />
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Serie</label>
+                    <input asp-for="Serie" class="form-control form-control-sm" />
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Herr/Dam</label>
+                    <select asp-for="KM" class="form-select form-select-sm">
+                        <option value="M">Herr</option>
+                        <option value="W">Dam</option>
+                    </select>
+                </div>
+                <div class="d-flex gap-2 mb-3">
+                    <button type="submit" asp-page-handler="SparaLag" class="btn btn-sm btn-primary">Spara ändringar</button>
+                    <button type="submit" asp-page-handler="RadereLag" class="btn btn-sm btn-danger"
+                            onclick="return confirm('Ta bort laget?')">Ta bort lag</button>
+                </div>
+            }
+
+            <a asp-page="/NyttLag" class="btn btn-sm btn-outline-primary">+ Nytt lag</a>
+        </form>
+    </div>
+
+    <!-- Höger: Spelare -->
+    <div class="col-md-8">
+        @if (!string.IsNullOrEmpty(Model.ValtLagID))
+        {
+            <h5>Spelare i laget</h5>
+            <form method="post">
+                <input type="hidden" asp-for="ValtLagID" />
+                <input type="hidden" asp-for="ValtSpelarID" id="valtSpelarID" />
+
+                <div class="row g-2 mb-3">
+                    <div class="col-3">
+                        <input asp-for="SpFörnamn" class="form-control form-control-sm" placeholder="Förnamn" />
+                    </div>
+                    <div class="col-3">
+                        <input asp-for="SpEfternamn" class="form-control form-control-sm" placeholder="Efternamn" />
+                    </div>
+                    <div class="col-2">
+                        <input asp-for="SpNummer" class="form-control form-control-sm" placeholder="Nr" />
+                    </div>
+                    <div class="col-2">
+                        <input asp-for="SpXNummer" class="form-control form-control-sm" placeholder="XNr" />
+                    </div>
+                    <div class="col-2">
+                        <select asp-for="SpPosition" class="form-select form-select-sm">
+                            <option value="VB">VB</option>
+                            <option value="HB">HB</option>
+                            <option value="CB">CB</option>
+                            <option value="LA">LA</option>
+                            <option value="RA">RA</option>
+                            <option value="PL">PL</option>
+                            <option value="MV">MV</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mb-3">
+                    <button type="submit" asp-page-handler="LaggTillSpelare" class="btn btn-sm btn-success">+ Lägg till spelare</button>
+                    @if (!string.IsNullOrEmpty(Model.ValtSpelarID))
+                    {
+                        <button type="submit" asp-page-handler="SparaSpelare" class="btn btn-sm btn-primary">Spara ändringar</button>
+                        <button type="submit" asp-page-handler="RaderaSpelare" class="btn btn-sm btn-danger"
+                                onclick="return confirm('Ta bort spelaren?')">Ta bort spelare</button>
+                    }
+                </div>
+
+                <!-- Spelarelista -->
+                @if (Model.SpelareLista.Any())
+                {
+                    <table class="table table-sm table-hover small">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Nr</th>
+                                <th>Namn</th>
+                                <th>Position</th>
+                                <th>XNr</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var sp in Model.SpelareLista)
+                            {
+                                <tr class="@(sp.SpelareID == Model.ValtSpelarID ? "table-primary" : "")"
+                                    style="cursor:pointer" onclick="välj('@sp.SpelareID', '@sp.Nummer', '@sp.Förnamn', '@sp.Efternamn', '@sp.Position', '@sp.XNummer')">
+                                    <td>@sp.Nummer</td>
+                                    <td>@sp.Förnamn @sp.Efternamn</td>
+                                    <td>@sp.Position</td>
+                                    <td>@sp.XNummer</td>
+                                    <td><button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0" onclick="välj('@sp.SpelareID', '@sp.Nummer', '@sp.Förnamn', '@sp.Efternamn', '@sp.Position', '@sp.XNummer')">Välj</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </form>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function välj(id, nummer, fornamn, efternamn, position, xnummer) {
+    document.getElementById('valtSpelarID').value = id;
+    document.querySelector('[name="SpFörnamn"]').value = fornamn;
+    document.querySelector('[name="SpEfternamn"]').value = efternamn;
+    document.querySelector('[name="SpNummer"]').value = nummer;
+    document.querySelector('[name="SpXNummer"]').value = xnummer;
+    document.querySelector('[name="SpPosition"]').value = position;
+}
+</script>
+}

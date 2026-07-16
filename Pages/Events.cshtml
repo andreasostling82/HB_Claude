@@ -1,0 +1,273 @@
+@page
+@model HB_Claude.Pages.EventsModel
+@using HB_Claude.Models
+@{
+    ViewData["Title"] = "Matchhändelser";
+    Layout = "_Layout";
+}
+
+<style>
+    .btn-event { min-width: 100px; min-height: 38px; font-size: 0.8rem; margin: 2px; padding: 4px 6px; }
+    .btn-zon { min-width: 70px; min-height: 32px; font-size: 0.8rem; margin: 2px; padding: 3px 6px; }
+    .player-btn { min-width: 130px; min-height: 32px; font-size: 0.8rem; margin: 2px; padding: 3px 6px; text-align: left; }
+    .player-btn.active { background-color: #0d6efd; color: white; }
+    #matchklocka { font-size: 1.8rem; font-weight: bold; font-family: monospace; }
+    .section-header { background-color: #6c757d; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-bottom: 2px; }
+    .form-select-sm { padding-top: 2px; padding-bottom: 2px; }
+    .gap-tight { gap: 0.3rem !important; margin-bottom: 0.3rem !important; }
+</style>
+
+<div class="row">
+    <!-- Vänster kolumn: lag, match, spellare -->
+    <div class="col-md-4">
+        <form method="post" id="mainForm">
+            <input type="hidden" asp-for="MatchTid" id="matchTidInput" />
+            <input type="hidden" asp-for="AktivSpelareID" id="aktivSpelarInput" />
+            <input type="hidden" asp-for="AktivSpelarPosition" id="aktivSpelarPosition" />
+            <input type="hidden" asp-for="HandelseTyp" id="handelseTypInput" />
+            <input type="hidden" asp-for="ZonVal" id="zonValInput" />
+            <input type="hidden" asp-for="FasVal" id="fasValInput" />
+
+            <!-- Lag & Match -->
+            <div class="row g-2 mb-1">
+                <div class="col-6">
+                    <select asp-for="ValtLagID" class="form-select form-select-sm" id="lagSelect" onchange="this.form.submit()" name="ValtLagID">
+                        @foreach (var l in Model.LagLista)
+                        {
+                            <option value="@l.LagID" selected="@(l.LagID == Model.ValtLagID ? "selected" : null)">@l.Namn</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-6">
+                    <select asp-for="ValtMatchID" class="form-select form-select-sm" id="matchSelect" onchange="bytMatch()" name="ValtMatchID">
+                        <option value="">Välj match</option>
+                        @foreach (var m in Model.MatchLista)
+                        {
+                            <option value="@m.MatchID" selected="@(m.MatchID == Model.ValtMatchID ? "selected" : null)">@m.Datum - @m.Motståndare</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- Match info & klocka -->
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span id="matchklocka">@Model.TidText</span>
+                <button type="submit" asp-page-handler="StartStop" class="btn btn-sm @(Model.MatchStatus == "Pågående" ? "btn-danger" : "btn-success")">
+                    @(Model.MatchStatus == "Pågående" ? "Stop" : "Start")
+                </button>
+                <button type="submit" asp-page-handler="PausFortsatt" class="btn btn-sm btn-warning" id="pausBtn"
+                        disabled="@(Model.MatchStatus != "Pågående" ? "disabled" : null)">
+                    @(Model.IsPaus ? "Fortsätt" : "Paus")
+                </button>
+                <a asp-page="/NyaMatcher" class="btn btn-sm btn-outline-primary">+ Ny match</a>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.StatusText))
+            {
+                <div class="alert alert-info py-1 mb-1 small"><strong>@Model.StatusText</strong></div>
+            }
+            @if (!string.IsNullOrEmpty(Model.SummaryText))
+            {
+                <div class="alert alert-secondary py-1 mb-1 small">@Model.SummaryText</div>
+            }
+            @if (!string.IsNullOrEmpty(Model.Felmeddelande))
+            {
+                <div class="alert alert-danger py-1 mb-1 small">@Model.Felmeddelande</div>
+            }
+
+            <!-- Spelarelista -->
+            @if (Model.SpelareLista.Any())
+            {
+                <div class="section-header">Välj spelare</div>
+                <div class="d-flex flex-wrap mb-1" id="spelareContainer">
+                    @foreach (var sp in Model.SpelareLista)
+                    {
+                        <button type="button"
+                                class="btn btn-outline-dark player-btn @(sp.SpID == Model.AktivSpelareID ? "active" : "")"
+                                onclick="välj('@sp.SpID', '@sp.position')"
+                                data-spid="@sp.SpID"
+                                data-position="@sp.position">
+                            @sp.Namn
+                        </button>
+                    }
+                </div>
+            }
+
+            <!-- Zon (visas ej för MV) -->
+            <div id="zonSection" style="display:@(Model.AktivSpelarPosition == "MV" || string.IsNullOrEmpty(Model.AktivSpelareID) ? "none" : "block")">
+                <div class="section-header">Zon</div>
+                <div class="d-flex flex-wrap mb-1">
+                    <input type="radio" class="btn-check" name="zonRadio" id="zonV1" value="1" onchange="setZon('1')" @(Model.ZonVal == "1" ? "checked" : "")>
+                    <label class="btn btn-outline-secondary btn-zon" for="zonV1">V1</label>
+                    <input type="radio" class="btn-check" name="zonRadio" id="zonV2" value="2" onchange="setZon('2')" @(Model.ZonVal == "2" ? "checked" : "")>
+                    <label class="btn btn-outline-secondary btn-zon" for="zonV2">V2</label>
+                    <input type="radio" class="btn-check" name="zonRadio" id="zonO3" value="3" onchange="setZon('3')" @(Model.ZonVal == "3" ? "checked" : "")>
+                    <label class="btn btn-outline-secondary btn-zon" for="zonO3">Mitt</label>
+                    <input type="radio" class="btn-check" name="zonRadio" id="zonH2" value="4" onchange="setZon('4')" @(Model.ZonVal == "4" ? "checked" : "")>
+                    <label class="btn btn-outline-secondary btn-zon" for="zonH2">H2</label>
+                    <input type="radio" class="btn-check" name="zonRadio" id="zonH1" value="5" onchange="setZon('5')" @(Model.ZonVal == "5" ? "checked" : "")>
+                    <label class="btn btn-outline-secondary btn-zon" for="zonH1">H1</label>
+                </div>
+
+                <!-- Fas -->
+                <div class="section-header">Fas</div>
+                <div class="d-flex flex-wrap mb-1">
+                    <input type="radio" class="btn-check" name="fasRadio" id="fasUpp" value="1" onchange="setFas('1')" @(Model.FasVal == "1" || string.IsNullOrEmpty(Model.FasVal) ? "checked" : "")>
+                    <label class="btn btn-outline-secondary btn-zon" for="fasUpp">Uppst.</label>
+                    <input type="radio" class="btn-check" name="fasRadio" id="fas1" value="2" onchange="setFas('2')" @(Model.FasVal == "2" ? "checked" : "")>
+                    <label class="btn btn-outline-secondary btn-zon" for="fas1">Fas 1</label>
+                    <input type="radio" class="btn-check" name="fasRadio" id="fas2" value="3" onchange="setFas('3')" @(Model.FasVal == "3" ? "checked" : "")>
+                    <label class="btn btn-outline-secondary btn-zon" for="fas2">Fas 2</label>
+                </div>
+
+                <!-- Fältspelarhändelser -->
+                <div class="section-header">Händelse - fältspelare</div>
+                <div class="d-flex flex-wrap mb-1">
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('_6m')">6M</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('_9m')">9M</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('Genombrott')">Genombrott</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('_Straff_Mål_')">Straff</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-warning btn-event" onclick="setHändelse('Räddning_')">Räddning</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-warning btn-event" onclick="setHändelse('Utanför_')">Utanför</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-warning btn-event" onclick="setHändelse('Skott_i_täcket')">I täcket</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Övertramp')">Övertramp</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Offensiv_stuermer')">Off. sturmare</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Stegfel')">Stegfel</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Passmiss')">Passmiss</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Tappad_boll')">Tappad boll</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Fot')">Fot</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Dubbelstuds')">Dubbelstuds</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-secondary btn-event" onclick="setHändelse('Assist')">Assist</button>
+                </div>
+            </div>
+
+            <!-- Målvaktshändelser -->
+            <div id="mvSection" style="display:@(Model.AktivSpelarPosition == "MV" ? "block" : "none")">
+                <div class="section-header">Händelse - målvakt</div>
+                <div class="d-flex flex-wrap mb-1">
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('Räddning 6M')">Räddning 6M</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('Räddning 9M')">Räddning 9M</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('Räddning Genombrott')">Räddning Genom.</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('Straff räddning')">Straff räddning</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Mål 6M')">Mål 6M</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Mål 9M')">Mål 9M</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Mål Genombrott')">Mål Genombrott</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Straff mål')">Straff mål</button>
+                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('M_TeknisktFel')">Tekniskt fel</button>
+                </div>
+            </div>
+
+        </form>
+    </div>
+
+    <!-- Höger kolumn: händelsetabell -->
+    <div class="col-md-8">
+        @if (Model.Händelser.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover small">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Tid</th>
+                            <th>Spelare</th>
+                            <th>Händelse</th>
+                            <th>T.Fel</th>
+                            <th>Zon</th>
+                            <th>Mål</th>
+                            <th>Avslut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var h in Model.Händelser)
+                        {
+                            <tr>
+                                <td>@h.Tid</td>
+                                <td>@h.Namn</td>
+                                <td>@h.Händelse</td>
+                                <td>@(h.TeknisktFel == "1" ? "X" : "")</td>
+                                <td>@h.Zon</td>
+                                <td>@(h.Mål == "1" ? "X" : "")</td>
+                                <td>@(h.Avslut == "1" ? "X" : "")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Match timer — use C# booleans to avoid HTML-encoding of Swedish characters
+    var matchPagaende = @(Model.MatchStatus == "Pågående" ? "true" : "false");
+    var isPaus = @(Model.IsPaus ? "true" : "false");
+    var matchTidSeconds = @Model.MatchTid;
+    var timerInterval = null;
+
+    function updateKlocka() {
+        var min = Math.floor(matchTidSeconds / 60);
+        var sec = matchTidSeconds % 60;
+        document.getElementById('matchklocka').textContent =
+            String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+        document.getElementById('matchTidInput').value = matchTidSeconds;
+    }
+
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(function () {
+            if (!isPaus) {
+                matchTidSeconds++;
+                updateKlocka();
+            }
+        }, 1000);
+    }
+
+    if (matchPagaende && !isPaus) {
+        startTimer();
+    }
+
+    updateKlocka();
+
+    function välj(spid, position) {
+        document.getElementById('aktivSpelarInput').value = spid;
+        document.getElementById('aktivSpelarPosition').value = position;
+
+        document.querySelectorAll('.player-btn').forEach(function (b) {
+            b.classList.toggle('active', b.dataset.spid === spid);
+        });
+
+        if (position === 'MV') {
+            document.getElementById('zonSection').style.display = 'none';
+            document.getElementById('mvSection').style.display = 'block';
+        } else {
+            document.getElementById('zonSection').style.display = 'block';
+            document.getElementById('mvSection').style.display = 'none';
+        }
+    }
+
+    function setHändelse(typ) {
+        document.getElementById('handelseTypInput').value = typ;
+        document.getElementById('matchTidInput').value = matchTidSeconds;
+    }
+
+    function setZon(zon) {
+        document.getElementById('zonValInput').value = zon;
+    }
+
+    function setFas(fas) {
+        document.getElementById('fasValInput').value = fas;
+    }
+
+    function bytMatch() {
+        var matchId = document.getElementById('matchSelect').value;
+        if (matchId) {
+            document.getElementById('mainForm').submit();
+        }
+    }
+
+    // Init fas/zon
+    document.getElementById('fasValInput').value = document.getElementById('fasValInput').value || '1';
+    document.getElementById('zonValInput').value = document.getElementById('zonValInput').value || '0';
+</script>
+}

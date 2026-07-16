@@ -1,0 +1,39 @@
+@page
+@model HB_Claude.Pages.RegistreringModel
+@{
+    ViewData["Title"] = "Registrering";
+    Layout = "_Layout";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">Skapa konto</h3>
+                @if (!string.IsNullOrEmpty(Model.Meddelande))
+                {
+                    <div class="alert @(Model.Success ? "alert-success" : "alert-danger")">@Model.Meddelande</div>
+                }
+                @if (!Model.Success)
+                {
+                    <form method="post">
+                        <div class="mb-3">
+                            <label class="form-label">E-post (används som användarnamn)</label>
+                            <input asp-for="Epost" type="email" class="form-control" placeholder="din@epost.se" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Antal lag</label>
+                            <input asp-for="AntalLag" type="number" class="form-control" placeholder="1" min="1" max="10" />
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Registrera</button>
+                        </div>
+                    </form>
+                }
+                <div class="mt-3 text-center">
+                    <a asp-page="/Index">Tillbaka till inloggning</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

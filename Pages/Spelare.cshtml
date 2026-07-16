@@ -1,0 +1,209 @@
+@page
+@model HB_Claude.Pages.SpelareModel
+@{
+    ViewData["Title"] = string.IsNullOrEmpty(Model.Namn) ? "Spelare" : Model.Namn;
+    Layout = "_Layout";
+    var posClass = Model.Position == "MV" ? "badge-mv" : Model.Position == "BK" ? "badge-bk" : "badge-ut";
+}
+
+<style>
+  .stat-card {
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 1.2rem 1.4rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  }
+  .stat-num {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--red);
+    line-height: 1.1;
+  }
+  .stat-lbl {
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .section-title {
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: .85rem;
+  }
+  .mm-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+  .mm-table th {
+    font-size: .68rem; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); font-weight: 700; padding: .45rem .75rem;
+    border-bottom: 2px solid var(--border); text-align: left; white-space: nowrap;
+  }
+  .mm-table td { padding: .5rem .75rem; border-bottom: 1px solid var(--border2); color: var(--text); }
+  .mm-table tr:last-child td { border-bottom: none; }
+  .mm-table tbody tr:hover td { background: var(--surface2); }
+  .mm-table td.num, .mm-table th.num { text-align: center; }
+  .badge-pos { font-size: .7rem; padding: .2rem .6rem; border-radius: 4px; font-weight: 600; letter-spacing: .3px; }
+  .badge-mv  { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-bd); }
+  .badge-bk  { background: var(--green-bg); color: var(--green); border: 1px solid #b3e8ce; }
+  .badge-ut  { background: #eef3fb; color: #2b5bbf; border: 1px solid #bed0f5; }
+  .col-mål  { font-weight: 600; color: var(--red); }
+  .back-link { font-size: .85rem; color: var(--muted); text-decoration: none; }
+  .back-link:hover { color: var(--text); }
+  .empty-state {
+    background: var(--surface); border-radius: 8px; border: 1px solid var(--border);
+    padding: 3rem; text-align: center; color: var(--muted); font-size: .9rem;
+  }
+</style>
+
+<div style="max-width:980px; margin:0 auto; padding:0 1rem 3rem;">
+
+  <div class="mb-3">
+    <a asp-page="/Sasongsstat" class="back-link">&larr; Tillbaka till säsongsstatistik</a>
+  </div>
+
+  @if (string.IsNullOrEmpty(Model.Namn) || Model.Matcher == 0)
+  {
+    <div class="empty-state">Ingen statistik hittades för den valda spelaren.</div>
+  }
+  else
+  {
+    <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+      <h4 class="mb-0 fw-bold" style="color:var(--text)">@Model.Namn</h4>
+      <span class="badge-pos @posClass">@Model.Position</span>
+      @if (!string.IsNullOrEmpty(Model.LagNamn))
+      {
+        <span style="color:var(--muted); font-size:.85rem">@Model.LagNamn</span>
+      }
+      <a asp-page="/Spelare" asp-page-handler="pdf" asp-route-namn="@Model.Namn"
+         class="btn btn-sm btn-outline-danger ms-auto">
+        &#128196; Ladda ner PDF
+      </a>
+    </div>
+
+    <!-- Summakort -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-num">@Model.Matcher</div>
+          <div class="stat-lbl">Matcher</div>
+        </div>
+      </div>
+
+      @if (Model.ÄrMålvakt)
+      {
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num" style="color:var(--green)">@Model.Räddningar</div>
+            <div class="stat-lbl">Räddningar</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num" style="color:var(--warn)">@Model.InsläpptaMål</div>
+            <div class="stat-lbl">Insläppta mål</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num" style="font-size:1.4rem; padding-top:.35rem; color:var(--text)">@Model.RäddningsProcent</div>
+            <div class="stat-lbl">Räddnings-%</div>
+          </div>
+        </div>
+      }
+      else
+      {
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num">@Model.Mål</div>
+            <div class="stat-lbl">Mål</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num" style="color:var(--text)">@Model.Avslut</div>
+            <div class="stat-lbl">Avslut</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num" style="font-size:1.4rem; padding-top:.35rem; color:var(--text)">@Model.MålPerAvslut</div>
+            <div class="stat-lbl">Mål per avslut</div>
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (!Model.ÄrMålvakt && Model.TekniskaFel > 0)
+    {
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-num" style="color:var(--warn)">@Model.TekniskaFel</div>
+            <div class="stat-lbl">Tekniska fel</div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Per match -->
+    <div class="stat-card">
+      <div class="section-title">Statistik per match</div>
+      <div class="table-responsive">
+        <table class="mm-table">
+          <thead>
+            @if (Model.ÄrMålvakt)
+            {
+              <tr>
+                <th>Datum</th>
+                <th>Motståndare</th>
+                <th class="num">Räddningar</th>
+                <th class="num">Insläppta</th>
+                <th class="num">Räddnings-%</th>
+              </tr>
+            }
+            else
+            {
+              <tr>
+                <th>Datum</th>
+                <th>Motståndare</th>
+                <th class="num">Mål</th>
+                <th class="num">Avslut</th>
+                <th class="num" title="Mål per avslut">Mål/A</th>
+                <th class="num" title="Tekniska fel">T.Fel</th>
+              </tr>
+            }
+          </thead>
+          <tbody>
+            @foreach (var r in Model.Matchrader)
+            {
+              if (Model.ÄrMålvakt)
+              {
+                <tr>
+                  <td style="color:var(--muted)">@r.Datum</td>
+                  <td>@r.Motståndare</td>
+                  <td class="num" style="font-weight:600; color:var(--green)">@r.Räddningar</td>
+                  <td class="num" style="color:var(--warn)">@r.InsläpptaMål</td>
+                  <td class="num" style="font-weight:600">@r.RäddningsProcent</td>
+                </tr>
+              }
+              else
+              {
+                <tr>
+                  <td style="color:var(--muted)">@r.Datum</td>
+                  <td>@r.Motståndare</td>
+                  <td class="num @(r.Mål > 0 ? "col-mål" : "")" style="@(r.Mål > 0 ? "" : "color:var(--muted)")">@r.Mål</td>
+                  <td class="num">@r.Avslut</td>
+                  <td class="num" style="color:var(--text2)">@r.MålPerAvslut</td>
+                  <td class="num" style="color:@(r.TekniskaFel > 0 ? "var(--warn)" : "var(--muted)")">@(r.TekniskaFel > 0 ? r.TekniskaFel.ToString() : "")</td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</div>

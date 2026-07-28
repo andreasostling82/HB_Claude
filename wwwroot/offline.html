@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline - MatchMate</title>
+    <style>
+        :root { --bg:#f2efe9; --surface:#fff; --red:#c8282a; --text:#191920; --text2:#505568; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg); color: var(--text); padding: 24px;
+        }
+        .card {
+            background: var(--surface); border-top: 4px solid var(--red); border-radius: 12px;
+            box-shadow: 0 6px 24px rgba(0,0,0,.10); max-width: 380px; width: 100%;
+            padding: 32px 28px; text-align: center;
+        }
+        h1 { font-size: 1.25rem; margin: 0 0 8px; }
+        p { color: var(--text2); font-size: .95rem; line-height: 1.5; margin: 0 0 20px; }
+        button {
+            background: var(--red); color: #fff; border: 0; border-radius: 8px;
+            padding: 12px 20px; font-size: 1rem; font-weight: 600; cursor: pointer; width: 100%;
+        }
+        .ball { width: 64px; height: 64px; margin: 0 auto 16px; display: block; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img class="ball" src="/icons/icon-192.png" alt="MatchMate" />
+        <h1>Ingen anslutning</h1>
+        <p>MatchMate behöver internet för att hämta lag, matcher och registrera händelser. Kontrollera din uppkoppling och försök igen.</p>
+        <button onclick="location.reload()">Försök igen</button>
+    </div>
+</body>
+</html>

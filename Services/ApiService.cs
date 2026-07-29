@@ -543,6 +543,28 @@ public class ApiService
             hanID = (await cmd1.ExecuteScalarAsync())?.ToString() ?? "0";
         }
 
+        // Självläkande: om händelsenamnet saknas i event_type (t.ex. en målvakts-
+        // placering som inte förseedats) skapas raden i stället för att lagras som
+        // "Okänt" (id=0). is_goal=0 – målvaktsmål räknas via text LIKE '%mål%', inte
+        // is_goal, och fältmål har redan sina rader.
+        if (hanID == "0" && !string.IsNullOrWhiteSpace(händelse.Händelsen))
+        {
+            await using (var heal = new MySqlCommand(
+                "INSERT INTO event_type (id, `text`, is_goal) " +
+                "SELECT COALESCE(MAX(id),0)+1, @nm, 0 FROM event_type " +
+                "WHERE NOT EXISTS (SELECT 1 FROM event_type WHERE `text`=@nm);", connection))
+            {
+                heal.Parameters.AddWithValue("@nm", händelse.Händelsen);
+                await heal.ExecuteNonQueryAsync();
+            }
+            await using (var re = new MySqlCommand(
+                "SELECT id FROM event_type WHERE `text`=@nm LIMIT 1;", connection))
+            {
+                re.Parameters.AddWithValue("@nm", händelse.Händelsen);
+                hanID = (await re.ExecuteScalarAsync())?.ToString() ?? "0";
+            }
+        }
+
         // client_event_id (offline-synk) gör inserten idempotent – se AddHändelse.
         await using (var cmd2 = new MySqlCommand(
             "INSERT INTO game_event (seconds, game_id, player_id, event_type_id, phase_id, zone_id, client_event_id) " +

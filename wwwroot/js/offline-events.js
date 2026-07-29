@@ -326,10 +326,9 @@
                 if (window.mmClock) window.mmClock.setStatus('Avslutad');
                 enqueue({ kind: 'status', matchId: ctx.matchId, status: 'Avslutad' }).then(function () { refresh(); });
             } else {
-                // Start: startmarkör + statusbyte
+                // Start: bara statusbyte (ingen startmarkör – se serverns Sync-handler)
                 if (window.mmClock) window.mmClock.start();
-                enqueue({ kind: 'startmarker', matchId: ctx.matchId, tids: '0' })
-                    .then(function () { return enqueue({ kind: 'status', matchId: ctx.matchId, status: 'Pågående' }); })
+                enqueue({ kind: 'status', matchId: ctx.matchId, status: 'Pågående' })
                     .then(function () { refresh(); });
             }
             return;
@@ -375,6 +374,7 @@
         document.querySelectorAll('.player-btn.active').forEach(function (el) { el.classList.remove('active'); });
         var zs = document.getElementById('zonSection'); if (zs) zs.style.display = 'none';
         var ms = document.getElementById('mvSection'); if (ms) ms.style.display = 'none';
+        if (window.resetMvSelection) window.resetMvSelection();
     }
 
     // ---------- Init ----------

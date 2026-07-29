@@ -11,6 +11,9 @@
     .btn-zon { min-width: 70px; min-height: 32px; font-size: 0.8rem; margin: 2px; padding: 3px 6px; }
     .player-btn { min-width: 130px; min-height: 32px; font-size: 0.8rem; margin: 2px; padding: 3px 6px; text-align: left; }
     .player-btn.active { background-color: #0d6efd; color: white; }
+    .mv-type.active { background-color: #0d6efd; color: white; border-color: #0d6efd; }
+    .mv-place { min-width: 84px; min-height: 42px; font-size: 0.75rem; margin: 2px; padding: 3px 6px; }
+    #mvPlacement.disabled { opacity: .45; pointer-events: none; }
     #matchklocka { font-size: 1.8rem; font-weight: bold; font-family: monospace; }
     .section-header { background-color: #6c757d; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-bottom: 2px; }
     .form-select-sm { padding-top: 2px; padding-bottom: 2px; }
@@ -144,18 +147,38 @@
                 </div>
             </div>
 
-            <!-- Målvaktshändelser -->
+            <!-- Målvaktshändelser: välj typ, sedan skottplacering (3x3) -->
             <div id="mvSection" style="display:@(Model.AktivSpelarPosition == "MV" ? "block" : "none")">
-                <div class="section-header">Händelse - målvakt</div>
+                <div class="section-header">Målvakt - välj typ</div>
+                <div class="d-flex flex-wrap mb-1" id="mvTypeRow">
+                    <button type="button" class="btn btn-outline-success btn-event mv-type" onclick="setMvType('Räddning 6M', this)">Räddning 6M</button>
+                    <button type="button" class="btn btn-outline-success btn-event mv-type" onclick="setMvType('Räddning 9M', this)">Räddning 9M</button>
+                    <button type="button" class="btn btn-outline-success btn-event mv-type" onclick="setMvType('Räddning Genombrott', this)">Räddning Genom.</button>
+                    <button type="button" class="btn btn-outline-success btn-event mv-type" onclick="setMvType('Straff räddning', this)">Straff räddning</button>
+                    <button type="button" class="btn btn-outline-danger btn-event mv-type" onclick="setMvType('Mål 6M', this)">Mål 6M</button>
+                    <button type="button" class="btn btn-outline-danger btn-event mv-type" onclick="setMvType('Mål 9M', this)">Mål 9M</button>
+                    <button type="button" class="btn btn-outline-danger btn-event mv-type" onclick="setMvType('Mål Genombrott', this)">Mål Genombrott</button>
+                    <button type="button" class="btn btn-outline-danger btn-event mv-type" onclick="setMvType('Straff mål', this)">Straff mål</button>
+                </div>
+                <div class="section-header">Placering <span id="mvHint" class="fw-normal ms-1"></span></div>
+                <div id="mvPlacement" class="mb-1 disabled">
+                    <div class="d-flex">
+                        <button type="submit" asp-page-handler="Händelse" class="btn btn-outline-secondary mv-place" onclick="return setMvHändelse('Uppe vänster')">Uppe V</button>
+                        <button type="submit" asp-page-handler="Händelse" class="btn btn-outline-secondary mv-place" onclick="return setMvHändelse('Uppe mitten')">Uppe M</button>
+                        <button type="submit" asp-page-handler="Händelse" class="btn btn-outline-secondary mv-place" onclick="return setMvHändelse('Uppe höger')">Uppe H</button>
+                    </div>
+                    <div class="d-flex">
+                        <button type="submit" asp-page-handler="Händelse" class="btn btn-outline-secondary mv-place" onclick="return setMvHändelse('Mitten vänster')">Mitten V</button>
+                        <button type="submit" asp-page-handler="Händelse" class="btn btn-outline-secondary mv-place" onclick="return setMvHändelse('Mitten mitten')">Mitten M</button>
+                        <button type="submit" asp-page-handler="Händelse" class="btn btn-outline-secondary mv-place" onclick="return setMvHändelse('Mitten höger')">Mitten H</button>
+                    </div>
+                    <div class="d-flex">
+                        <button type="submit" asp-page-handler="Händelse" class="btn btn-outline-secondary mv-place" onclick="return setMvHändelse('Nere vänster')">Nere V</button>
+                        <button type="submit" asp-page-handler="Händelse" class="btn btn-outline-secondary mv-place" onclick="return setMvHändelse('Nere mitten')">Nere M</button>
+                        <button type="submit" asp-page-handler="Händelse" class="btn btn-outline-secondary mv-place" onclick="return setMvHändelse('Nere höger')">Nere H</button>
+                    </div>
+                </div>
                 <div class="d-flex flex-wrap mb-1">
-                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('Räddning 6M')">Räddning 6M</button>
-                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('Räddning 9M')">Räddning 9M</button>
-                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('Räddning Genombrott')">Räddning Genom.</button>
-                    <button type="submit" asp-page-handler="Händelse" class="btn btn-success btn-event" onclick="setHändelse('Straff räddning')">Straff räddning</button>
-                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Mål 6M')">Mål 6M</button>
-                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Mål 9M')">Mål 9M</button>
-                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Mål Genombrott')">Mål Genombrott</button>
-                    <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('Straff mål')">Straff mål</button>
                     <button type="submit" asp-page-handler="Händelse" class="btn btn-danger btn-event" onclick="setHändelse('M_TeknisktFel')">Tekniskt fel</button>
                 </div>
             </div>
@@ -303,6 +326,7 @@
     function välj(spid, position) {
         document.getElementById('aktivSpelarInput').value = spid;
         document.getElementById('aktivSpelarPosition').value = position;
+        resetMvSelection();
 
         document.querySelectorAll('.player-btn').forEach(function (b) {
             b.classList.toggle('active', b.dataset.spid === spid);
@@ -321,6 +345,34 @@
         document.getElementById('handelseTypInput').value = typ;
         document.getElementById('matchTidInput').value = matchTidSeconds;
     }
+
+    // Målvakt: två steg – välj typ, sedan skottplacering i 3x3-rutnätet
+    var mvType = '';
+    function setMvType(typ, btn) {
+        mvType = typ;
+        document.querySelectorAll('.mv-type').forEach(function (b) { b.classList.remove('active'); });
+        if (btn) btn.classList.add('active');
+        document.getElementById('mvPlacement').classList.remove('disabled');
+        var h = document.getElementById('mvHint');
+        if (h) h.textContent = '– ' + typ + ': välj var skottet gick';
+    }
+    function setMvHändelse(placering) {
+        if (!mvType) {
+            var h = document.getElementById('mvHint');
+            if (h) h.textContent = '– välj händelsetyp först!';
+            return false; // blockerar submit
+        }
+        document.getElementById('handelseTypInput').value = mvType + ': ' + placering;
+        document.getElementById('matchTidInput').value = matchTidSeconds;
+        return true;
+    }
+    function resetMvSelection() {
+        mvType = '';
+        document.querySelectorAll('.mv-type.active').forEach(function (b) { b.classList.remove('active'); });
+        var p = document.getElementById('mvPlacement'); if (p) p.classList.add('disabled');
+        var h = document.getElementById('mvHint'); if (h) h.textContent = '';
+    }
+    window.resetMvSelection = resetMvSelection;
 
     function setZon(zon) {
         document.getElementById('zonValInput').value = zon;

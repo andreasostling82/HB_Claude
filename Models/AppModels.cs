@@ -152,3 +152,38 @@ public class antM
     public string Namn { get; set; } = "";
     public string antMa { get; set; } = "";
 }
+
+// ---- Offline / sync ----
+
+public class EventType
+{
+    public string Id { get; set; } = "";
+    public string Text { get; set; } = "";
+    public bool IsGoal { get; set; }
+}
+
+// En köad operation från offline-klienten.
+// Kind: "event" (registrerad händelse), "status" (byt matchstatus), "startmarker" (start-rad).
+public class SyncOp
+{
+    public string Kind { get; set; } = "event";
+    public string ClientId { get; set; } = "";
+    public string MatchId { get; set; } = "";
+    public string PlayerId { get; set; } = "";
+    public string Handelsen { get; set; } = "";
+    public string Fas { get; set; } = "0";
+    public string Zon { get; set; } = "0";
+    public string Tids { get; set; } = "0";
+    public string Status { get; set; } = "";
+}
+
+public class SyncBatch
+{
+    public List<SyncOp> Ops { get; set; } = new();
+}
+
+public class SyncResult
+{
+    public List<string> Confirmed { get; set; } = new();
+    public List<string> Failed { get; set; } = new();
+}

@@ -4,7 +4,7 @@
 // NOTE: POST requests (login, API calls, event registration) are never cached —
 // they require the network, as expected for this scope.
 
-const CACHE_VERSION = 'matchmate-v1';
+const CACHE_VERSION = 'matchmate-v2';
 const PRECACHE = [
   '/offline.html',
   '/manifest.webmanifest',
@@ -41,10 +41,25 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   // Page navigations: network-first so users always get fresh, correctly
-  // authenticated pages; fall back to the offline page when offline.
+  // authenticated pages. Cache the Events page so it can be opened offline
+  // (that's where offline registration happens). Other pages fall back to the
+  // offline page when there is no network.
   if (req.mode === 'navigate') {
+    const isEvents = url.pathname === '/' || url.pathname.toLowerCase().startsWith('/events');
     event.respondWith(
-      fetch(req).catch(() => caches.match('/offline.html'))
+      fetch(req)
+        .then((res) => {
+          if (isEvents && res && res.status === 200) {
+            const copy = res.clone();
+            caches.open(CACHE_VERSION).then((c) => c.put('/Events', copy));
+          }
+          return res;
+        })
+        .catch(() =>
+          caches.match(req).then((cached) =>
+            cached || (isEvents ? caches.match('/Events') : null) || caches.match('/offline.html')
+          )
+        )
     );
     return;
   }

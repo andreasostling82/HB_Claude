@@ -511,21 +511,26 @@ public class ApiService
 
     // ---- Händelser (Events) ----
 
-    public async Task<bool> AddHändelse(Händelse händelse)
+    public async Task<bool> AddHändelse(Händelse händelse, string? clientEventId = null)
     {
         await using var connection = new MySqlConnection(ConnStr);
         await connection.OpenAsync();
+        // client_event_id (offline-synk) gör inserten idempotent: en omsynkad rad blir
+        // en no-op i stället för dubblett. NULL för online-inserts (matchar aldrig UNIQUE).
         await using var cmd = new MySqlCommand(
-            "INSERT INTO game_event (seconds, game_id, player_id, event_type_id) VALUES (@Tids, @MatchID, @SpelareID, @HändelseID);", connection);
+            "INSERT INTO game_event (seconds, game_id, player_id, event_type_id, client_event_id) " +
+            "VALUES (@Tids, @MatchID, @SpelareID, @HändelseID, @Cid) " +
+            "ON DUPLICATE KEY UPDATE client_event_id = client_event_id;", connection);
         cmd.Parameters.AddWithValue("@Tids", händelse.Tids);
         cmd.Parameters.AddWithValue("@MatchID", händelse.MatchID);
         cmd.Parameters.AddWithValue("@SpelareID", händelse.SpelareID);
         cmd.Parameters.AddWithValue("@HändelseID", händelse.HändelseID);
+        cmd.Parameters.AddWithValue("@Cid", string.IsNullOrEmpty(clientEventId) ? DBNull.Value : clientEventId);
         await cmd.ExecuteNonQueryAsync();
         return true;
     }
 
-    public async Task<List<EventsTyp>?> AddMultiHändelse3(Händelse händelse)
+    public async Task<List<EventsTyp>?> AddMultiHändelse3(Händelse händelse, string? clientEventId = null)
     {
         await using var connection = new MySqlConnection(ConnStr);
         await connection.OpenAsync();
@@ -538,8 +543,11 @@ public class ApiService
             hanID = (await cmd1.ExecuteScalarAsync())?.ToString() ?? "0";
         }
 
+        // client_event_id (offline-synk) gör inserten idempotent – se AddHändelse.
         await using (var cmd2 = new MySqlCommand(
-            "INSERT INTO game_event (seconds, game_id, player_id, event_type_id, phase_id, zone_id) VALUES (@Tids, @MatchID, @SpelareID, @HändelseID, @Fas, @Zon);", connection))
+            "INSERT INTO game_event (seconds, game_id, player_id, event_type_id, phase_id, zone_id, client_event_id) " +
+            "VALUES (@Tids, @MatchID, @SpelareID, @HändelseID, @Fas, @Zon, @Cid) " +
+            "ON DUPLICATE KEY UPDATE client_event_id = client_event_id;", connection))
         {
             cmd2.Parameters.AddWithValue("@Tids", händelse.Tids);
             cmd2.Parameters.AddWithValue("@MatchID", händelse.MatchID);
@@ -547,6 +555,7 @@ public class ApiService
             cmd2.Parameters.AddWithValue("@HändelseID", hanID);
             cmd2.Parameters.AddWithValue("@Fas", händelse.Fas);
             cmd2.Parameters.AddWithValue("@Zon", händelse.Zon);
+            cmd2.Parameters.AddWithValue("@Cid", string.IsNullOrEmpty(clientEventId) ? DBNull.Value : clientEventId);
             await cmd2.ExecuteNonQueryAsync();
         }
 
@@ -733,6 +742,24 @@ public class ApiService
                 Fel = reader["Fel"].ToString() ?? ""
             });
         return list.Count > 0 ? list : null;
+    }
+
+    public async Task<List<EventType>> GetEventTypes()
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "SELECT id, `text`, is_goal FROM event_type;", connection);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var list = new List<EventType>();
+        while (await reader.ReadAsync())
+            list.Add(new EventType
+            {
+                Id = reader["id"].ToString() ?? "",
+                Text = reader["text"].ToString() ?? "",
+                IsGoal = reader["is_goal"] != DBNull.Value && Convert.ToInt32(reader["is_goal"]) == 1
+            });
+        return list;
     }
 
     public async Task<List<HA>?> GetHA(string hid)

@@ -326,4 +326,99 @@ public class EventsModel : PageModel
         }
         catch { }
     }
+
+    // =====================================================================
+    //  Offline-stöd (JSON-endpoints som offline-events.js använder)
+    // =====================================================================
+
+    // GET /Events?handler=OfflineBundle&lagId=123
+    // Referensdata som klienten cachar i IndexedDB för offline-registrering.
+    public async Task<IActionResult> OnGetOfflineBundleAsync(string lagId)
+    {
+        if (string.IsNullOrEmpty(UserId)) return new JsonResult(new { error = "auth" }) { StatusCode = 401 };
+        if (string.IsNullOrEmpty(lagId)) return new JsonResult(new { error = "lagId" }) { StatusCode = 400 };
+
+        var spelare = await _api.GetListaOfSpelare(lagId) ?? new();
+        var matcher = await _api.GetMatchInfoEJ_Avslutade(lagId);
+        var eventTypes = await _api.GetEventTypes();
+
+        var players = spelare.Select(s => new
+        {
+            spId = s.SpelareID,
+            nummer = s.Nummer,
+            xnummer = s.XNummer,
+            fornamn = s.Förnamn.Trim(),
+            efternamn = s.Efternamn.Trim(),
+            position = s.Position
+        });
+
+        var matches = matcher.Select(m => new
+        {
+            matchId = m.MatchID,
+            datum = m.Datum,
+            motstandare = m.Motståndare,
+            status = m.Status
+        });
+
+        var types = eventTypes.Select(t => new { id = t.Id, text = t.Text, isGoal = t.IsGoal });
+
+        return new JsonResult(new { lagId, players, matches, eventTypes = types });
+    }
+
+    // POST /Events?handler=Sync  (JSON-kropp: { ops: [...] })
+    // Applicerar köade offline-operationer i ordning och returnerar bekräftade clientIds.
+    public async Task<IActionResult> OnPostSyncAsync([FromBody] SyncBatch batch)
+    {
+        if (string.IsNullOrEmpty(UserId)) return new JsonResult(new { error = "auth" }) { StatusCode = 401 };
+
+        var result = new SyncResult();
+        if (batch?.Ops == null) return new JsonResult(result);
+
+        foreach (var op in batch.Ops)
+        {
+            try
+            {
+                switch (op.Kind)
+                {
+                    case "status":
+                        await _api.SetMatchStatus(op.MatchId, op.Status);
+                        break;
+
+                    case "startmarker":
+                        await _api.AddHändelse(new Händelse
+                        {
+                            MatchID = op.MatchId,
+                            SpelareID = "0",
+                            HändelseID = "0",
+                            Tids = op.Tids,
+                            Fas = "0",
+                            Zon = "0"
+                        }, op.ClientId);
+                        break;
+
+                    default: // "event"
+                        await _api.AddMultiHändelse3(new Händelse
+                        {
+                            Händelsen = op.Handelsen,
+                            MatchID = op.MatchId,
+                            SpelareID = op.PlayerId,
+                            HändelseID = "",
+                            Tids = op.Tids,
+                            Fas = op.Fas,
+                            Zon = op.Zon
+                        }, op.ClientId);
+                        break;
+                }
+                result.Confirmed.Add(op.ClientId);
+            }
+            catch
+            {
+                // Stoppa vid första felet så ordningen bevaras – resten kan synkas senare.
+                result.Failed.Add(op.ClientId);
+                break;
+            }
+        }
+
+        return new JsonResult(result);
+    }
 }

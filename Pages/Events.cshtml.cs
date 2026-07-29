@@ -393,7 +393,7 @@ public class EventsModel : PageModel
                             Tids = op.Tids,
                             Fas = "0",
                             Zon = "0"
-                        });
+                        }, op.ClientId);
                         break;
 
                     default: // "event"
@@ -406,7 +406,7 @@ public class EventsModel : PageModel
                             Tids = op.Tids,
                             Fas = op.Fas,
                             Zon = op.Zon
-                        });
+                        }, op.ClientId);
                         break;
                 }
                 result.Confirmed.Add(op.ClientId);

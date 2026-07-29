@@ -735,6 +735,24 @@ public class ApiService
         return list.Count > 0 ? list : null;
     }
 
+    public async Task<List<EventType>> GetEventTypes()
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "SELECT id, `text`, is_goal FROM event_type;", connection);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var list = new List<EventType>();
+        while (await reader.ReadAsync())
+            list.Add(new EventType
+            {
+                Id = reader["id"].ToString() ?? "",
+                Text = reader["text"].ToString() ?? "",
+                IsGoal = reader["is_goal"] != DBNull.Value && Convert.ToInt32(reader["is_goal"]) == 1
+            });
+        return list;
+    }
+
     public async Task<List<HA>?> GetHA(string hid)
     {
         await using var connection = new MySqlConnection(ConnStr);

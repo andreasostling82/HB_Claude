@@ -89,17 +89,9 @@ public class EventsModel : PageModel
         }
         else
         {
-            // Start
-            var h = new Händelse
-            {
-                MatchID = matchId,
-                SpelareID = "0",
-                HändelseID = "0",
-                Tids = "0",
-                Fas = "0",
-                Zon = "0"
-            };
-            await _api.AddHändelse(h);
+            // Start – sätt bara status. (Den gamla "startmarkören" med SpelareID=0/HändelseID=0
+            // bryter mot FK:n player_id->player.id i v2 och fyller ingen funktion; klockan
+            // återupptas ändå via GetMaxTid.)
             await _api.SetMatchStatus(matchId, "Pågående");
             HttpContext.Session.SetString("matchStatus", "Pågående");
             HttpContext.Session.SetString("matchStart", DateTime.Now.ToString("O"));
@@ -385,15 +377,8 @@ public class EventsModel : PageModel
                         break;
 
                     case "startmarker":
-                        await _api.AddHändelse(new Händelse
-                        {
-                            MatchID = op.MatchId,
-                            SpelareID = "0",
-                            HändelseID = "0",
-                            Tids = op.Tids,
-                            Fas = "0",
-                            Zon = "0"
-                        }, op.ClientId);
+                        // No-op: startmarkören har ingen effekt i v2 (och bröt FK). Bekräftas
+                        // så att ev. gamla köade startmarkörer rensas ur klientens kö.
                         break;
 
                     default: // "event"
@@ -413,9 +398,10 @@ public class EventsModel : PageModel
             }
             catch
             {
-                // Stoppa vid första felet så ordningen bevaras – resten kan synkas senare.
+                // Hoppa över operationen men fortsätt med resten – en enstaka felande op
+                // (t.ex. saknad spelare) ska inte blockera hela batchen. Failade ligger
+                // kvar i klientens kö och kan synkas igen senare.
                 result.Failed.Add(op.ClientId);
-                break;
             }
         }
 

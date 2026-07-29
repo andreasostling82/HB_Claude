@@ -17,10 +17,13 @@
     .gap-tight { gap: 0.3rem !important; margin-bottom: 0.3rem !important; }
 </style>
 
+<div id="mmOfflineBar"></div>
+
 <div class="row">
     <!-- Vänster kolumn: lag, match, spellare -->
     <div class="col-md-4">
         <form method="post" id="mainForm">
+            @Html.AntiForgeryToken()
             <input type="hidden" asp-for="MatchTid" id="matchTidInput" />
             <input type="hidden" asp-for="AktivSpelareID" id="aktivSpelarInput" />
             <input type="hidden" asp-for="AktivSpelarPosition" id="aktivSpelarPosition" />
@@ -52,7 +55,7 @@
             <!-- Match info & klocka -->
             <div class="d-flex align-items-center gap-2 mb-1">
                 <span id="matchklocka">@Model.TidText</span>
-                <button type="submit" asp-page-handler="StartStop" class="btn btn-sm @(Model.MatchStatus == "Pågående" ? "btn-danger" : "btn-success")">
+                <button type="submit" asp-page-handler="StartStop" id="startStopBtn" class="btn btn-sm @(Model.MatchStatus == "Pågående" ? "btn-danger" : "btn-success")">
                     @(Model.MatchStatus == "Pågående" ? "Stop" : "Start")
                 </button>
                 <button type="submit" asp-page-handler="PausFortsatt" class="btn btn-sm btn-warning" id="pausBtn"
@@ -162,6 +165,8 @@
 
     <!-- Höger kolumn: händelsetabell -->
     <div class="col-md-8">
+        <div id="mmQueueSummary"></div>
+        <div id="mmQueue"></div>
         @if (Model.Händelser.Any())
         {
             <div class="table-responsive">
@@ -198,12 +203,43 @@
 </div>
 
 @section Scripts {
+<script src="~/js/offline-events.js" asp-append-version="true"></script>
 <script>
     // Match timer — use C# booleans to avoid HTML-encoding of Swedish characters
     var matchPagaende = @(Model.MatchStatus == "Pågående" ? "true" : "false");
     var isPaus = @(Model.IsPaus ? "true" : "false");
     var matchTidSeconds = @Model.MatchTid;
     var timerInterval = null;
+
+    // Kontext + status som JSON (JsonSerializer escapar svenska tecken korrekt för JS)
+    var mmCtx = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new { lagId = Model.ValtLagID, matchId = Model.ValtMatchID, matchStatus = Model.MatchStatus }));
+    var matchStatusStr = mmCtx.matchStatus;
+    var CLOCK_KEY = 'mm_clock';
+
+    function persistClock() {
+        try {
+            localStorage.setItem(CLOCK_KEY, JSON.stringify({
+                matchId: mmCtx.matchId, sec: matchTidSeconds, isPaus: isPaus,
+                pagaende: matchPagaende, status: matchStatusStr, ts: Date.now()
+            }));
+        } catch (e) { }
+    }
+
+    // Offline: återställ klocka/status från localStorage så den överlever reload utan nät
+    (function restoreClock() {
+        try {
+            if (navigator.onLine) return;
+            var raw = localStorage.getItem(CLOCK_KEY);
+            if (!raw) return;
+            var st = JSON.parse(raw);
+            if (st && st.matchId === mmCtx.matchId) {
+                matchTidSeconds = st.sec || 0;
+                isPaus = !!st.isPaus;
+                matchPagaende = !!st.pagaende;
+                matchStatusStr = st.status || matchStatusStr;
+            }
+        } catch (e) { }
+    })();
 
     function updateKlocka() {
         var min = Math.floor(matchTidSeconds / 60);
@@ -219,9 +255,44 @@
             if (!isPaus) {
                 matchTidSeconds++;
                 updateKlocka();
+                persistClock();
             }
         }, 1000);
     }
+
+    function updateStartStopBtn() {
+        var b = document.getElementById('startStopBtn');
+        if (b) {
+            if (matchStatusStr === 'Pågående') { b.textContent = 'Stop'; b.className = 'btn btn-sm btn-danger'; }
+            else { b.textContent = 'Start'; b.className = 'btn btn-sm btn-success'; }
+        }
+        var pb = document.getElementById('pausBtn');
+        if (pb) pb.disabled = (matchStatusStr !== 'Pågående');
+    }
+    function updatePausBtn() {
+        var pb = document.getElementById('pausBtn');
+        if (pb) pb.textContent = isPaus ? 'Fortsätt' : 'Paus';
+    }
+
+    // API som offline-lagret (offline-events.js) styr klockan igenom
+    window.mmClock = {
+        seconds: function () { return matchTidSeconds; },
+        status: function () { return matchStatusStr; },
+        togglePaus: function () {
+            isPaus = !isPaus;
+            if (!isPaus && matchPagaende) startTimer();
+            updatePausBtn(); persistClock();
+        },
+        start: function () {
+            matchStatusStr = 'Pågående'; matchPagaende = true; isPaus = false; matchTidSeconds = 0;
+            updateKlocka(); startTimer(); updateStartStopBtn(); updatePausBtn(); persistClock();
+        },
+        setStatus: function (s) {
+            matchStatusStr = s; matchPagaende = (s === 'Pågående');
+            if (s !== 'Pågående') { isPaus = true; if (timerInterval) clearInterval(timerInterval); }
+            updateStartStopBtn(); updatePausBtn(); persistClock();
+        }
+    };
 
     if (matchPagaende && !isPaus) {
         startTimer();
@@ -269,5 +340,9 @@
     // Init fas/zon
     document.getElementById('fasValInput').value = document.getElementById('fasValInput').value || '1';
     document.getElementById('zonValInput').value = document.getElementById('zonValInput').value || '0';
+
+    // Starta offline-lagret
+    mmCtx.token = (document.querySelector('input[name="__RequestVerificationToken"]') || {}).value || '';
+    if (window.MM) MM.init(mmCtx);
 </script>
 }

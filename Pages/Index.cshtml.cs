@@ -51,4 +51,16 @@ public class IndexModel : PageModel
         HttpContext.Session.SetString("epost", us.UserName);
         return Redirect(action switch { "lagbygge" => "/Lagbygge", "stats" => "/Stats", _ => "/Events" });
     }
+
+    // Logga in på det publika testkontot utan lösenord. Seedar demodata
+    // (testlag, testspelare, testmatcher) om kontot är tomt.
+    public async Task<IActionResult> OnPostTestAsync()
+    {
+        var u = await _api.EnsureTestAccount();
+        await _api.SeedTestDataIfEmpty(u.UserID);
+        HttpContext.Session.SetString("user", u.UserID);
+        HttpContext.Session.SetString("typ", string.IsNullOrEmpty(u.typ) ? "1" : u.typ);
+        HttpContext.Session.SetString("epost", u.UserName);
+        return Redirect("/Events");
+    }
 }

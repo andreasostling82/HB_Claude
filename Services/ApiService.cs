@@ -122,15 +122,19 @@ public class ApiService
         catch { return null; }
     }
 
-    public async Task<User?> GetUserFromHash(string hash)
+    public async Task<User?> GetUserFromHash(string hash, string email)
     {
         await using var connection = new MySqlConnection(ConnStr);
         await connection.OpenAsync();
+        // Matcha på BÅDE e-post och hash. Annars kan två konton med samma lösenord
+        // (= samma hash) logga in som varandra, eftersom hashen ensam inte är unik.
         await using var cmd = new MySqlCommand(
             "SELECT IFNULL(UU.delegate_user_id, U.id) AS UserID, U.email AS UserName, U.password_hash AS Password, " +
             "U.role AS typ, U.status AS status " +
-            "FROM app_user U LEFT JOIN user_delegate UU ON U.id=UU.user_id WHERE U.password_hash=@hsh;", connection);
+            "FROM app_user U LEFT JOIN user_delegate UU ON U.id=UU.user_id " +
+            "WHERE U.password_hash=@hsh AND replace(U.email,'+','')=@email;", connection);
         cmd.Parameters.AddWithValue("@hsh", hash);
+        cmd.Parameters.AddWithValue("@email", email);
         await using var reader = await cmd.ExecuteReaderAsync();
         if (!await reader.ReadAsync()) return null;
         return new User
@@ -146,6 +150,19 @@ public class ApiService
     public Task<string> GetHash(string pwd)
     {
         return Task.FromResult(ComputeMd5(pwd + _salt));
+    }
+
+    // Verifierar ett lösenord mot samma trestegs-fallback som inloggningen använder
+    // (rått lösenord, SHA256(email+lösenord), MD5(lösenord+salt)). Returnerar användaren
+    // om något schema matchar, annars null.
+    public async Task<User?> AuthenticateUser(string email, string password)
+    {
+        var us = await GetUser(email, password);
+        if (us == null)
+            us = await GetUserFromHash(Hash256(email, password), email);
+        if (us == null)
+            us = await GetUserFromHash((await GetHash(password)).Trim('"'), email);
+        return us;
     }
 
     public async Task<bool> NewUser(User user)
@@ -387,7 +404,7 @@ public class ApiService
         cmd.Parameters.AddWithValue("@Efternamn", spelare.Efternamn);
         cmd.Parameters.AddWithValue("@Förnamn", spelare.Förnamn);
         cmd.Parameters.AddWithValue("@LagID", spelare.LagID);
-        cmd.Parameters.AddWithValue("@Nummer", spelare.Nummer);
+        cmd.Parameters.AddWithValue("@Nummer", int.TryParse(spelare.Nummer, out var nr) ? nr : 0);
         cmd.Parameters.AddWithValue("@Position", spelare.Position);
         await cmd.ExecuteNonQueryAsync();
         return true;
@@ -404,9 +421,9 @@ public class ApiService
         cmd.Parameters.AddWithValue("@Efternamn", spelare.Efternamn);
         cmd.Parameters.AddWithValue("@Förnamn", spelare.Förnamn);
         cmd.Parameters.AddWithValue("@LagID", spelare.LagID);
-        cmd.Parameters.AddWithValue("@Nummer", spelare.Nummer);
+        cmd.Parameters.AddWithValue("@Nummer", int.TryParse(spelare.Nummer, out var nr) ? nr : 0);
         cmd.Parameters.AddWithValue("@Position", spelare.Position);
-        cmd.Parameters.AddWithValue("@Alt", spelare.XNummer.Length > 0 ? spelare.XNummer : DBNull.Value);
+        cmd.Parameters.AddWithValue("@Alt", int.TryParse(spelare.XNummer, out var alt) ? alt : (object)DBNull.Value);
         cmd.Parameters.AddWithValue("@SpelareID", spelare.SpelareID);
         await cmd.ExecuteNonQueryAsync();
         return true;

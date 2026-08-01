@@ -1,0 +1,43 @@
+@page
+@model HB_Claude.Pages.BytLosenordModel
+@{
+    ViewData["Title"] = "Byt lösenord";
+    Layout = "_Layout";
+}
+
+<div class="row justify-content-center mt-4">
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">Byt lösenord</h3>
+                @if (!string.IsNullOrEmpty(Model.Meddelande))
+                {
+                    <div class="alert @(Model.Success ? "alert-success" : "alert-danger")">@Model.Meddelande</div>
+                }
+                @if (!Model.Success)
+                {
+                    <form method="post">
+                        <div class="mb-3">
+                            <label class="form-label">Nuvarande lösenord</label>
+                            <input asp-for="Nuvarande" type="password" autocomplete="current-password" required class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Nytt lösenord</label>
+                            <input asp-for="Nytt" type="password" autocomplete="new-password" minlength="6" required class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Bekräfta nytt lösenord</label>
+                            <input asp-for="Bekrafta" type="password" autocomplete="new-password" minlength="6" required class="form-control" />
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Spara nytt lösenord</button>
+                        </div>
+                    </form>
+                }
+                <div class="mt-3 text-center">
+                    <a asp-page="/Events">Tillbaka</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

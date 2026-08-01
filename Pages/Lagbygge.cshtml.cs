@@ -24,7 +24,7 @@ public class LagbyggeModel : PageModel
     [BindProperty] public string SpEfternamn { get; set; } = "";
     [BindProperty] public string SpNummer { get; set; } = "";
     [BindProperty] public string SpXNummer { get; set; } = "";
-    [BindProperty] public string SpPosition { get; set; } = "VB";
+    [BindProperty] public string SpPosition { get; set; } = "MV";
 
     public string Meddelande { get; set; } = "";
     private string UserId => HttpContext.Session.GetString("user") ?? "";
@@ -90,13 +90,21 @@ public class LagbyggeModel : PageModel
     public async Task<IActionResult> OnPostLaggTillSpelareAsync()
     {
         if (string.IsNullOrEmpty(UserId)) return RedirectToPage("/Index");
+        if (!int.TryParse(SpNummer?.Trim(), out _))
+        {
+            Meddelande = "Ange ett nummer för spelaren.";
+            await LaddaLag();
+            await FyllLagInfo();
+            await LaddaSpelare();
+            return Page();
+        }
         var sp = new Spelare
         {
             LagID = ValtLagID,
-            Förnamn = SpFörnamn.Trim(),
-            Efternamn = SpEfternamn.Trim(),
-            Nummer = SpNummer.Trim(),
-            XNummer = SpXNummer.Trim(),
+            Förnamn = (SpFörnamn ?? "").Trim(),
+            Efternamn = (SpEfternamn ?? "").Trim(),
+            Nummer = (SpNummer ?? "").Trim(),
+            XNummer = (SpXNummer ?? "").Trim(),
             Position = SpPosition
         };
         await _api.AddPlayer(sp);
@@ -109,14 +117,22 @@ public class LagbyggeModel : PageModel
     public async Task<IActionResult> OnPostSparaSpelareAsync()
     {
         if (string.IsNullOrEmpty(UserId)) return RedirectToPage("/Index");
+        if (!int.TryParse(SpNummer?.Trim(), out _))
+        {
+            Meddelande = "Ange ett nummer för spelaren.";
+            await LaddaLag();
+            await FyllLagInfo();
+            await LaddaSpelare();
+            return Page();
+        }
         var sp = new Spelare
         {
             SpelareID = ValtSpelarID,
             LagID = ValtLagID,
-            Förnamn = SpFörnamn.Trim(),
-            Efternamn = SpEfternamn.Trim(),
-            Nummer = SpNummer.Trim(),
-            XNummer = SpXNummer.Trim(),
+            Förnamn = (SpFörnamn ?? "").Trim(),
+            Efternamn = (SpEfternamn ?? "").Trim(),
+            Nummer = (SpNummer ?? "").Trim(),
+            XNummer = (SpXNummer ?? "").Trim(),
             Position = SpPosition
         };
         await _api.UpdateSpelare(sp);

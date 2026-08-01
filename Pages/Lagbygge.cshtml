@@ -77,20 +77,20 @@
                         <input asp-for="SpEfternamn" class="form-control form-control-sm" placeholder="Efternamn" />
                     </div>
                     <div class="col-2">
-                        <input asp-for="SpNummer" class="form-control form-control-sm" placeholder="Nr" />
+                        <input asp-for="SpNummer" type="number" inputmode="numeric" min="0" required class="form-control form-control-sm" placeholder="Nr" />
                     </div>
                     <div class="col-2">
                         <input asp-for="SpXNummer" class="form-control form-control-sm" placeholder="XNr" />
                     </div>
                     <div class="col-2">
                         <select asp-for="SpPosition" class="form-select form-select-sm">
-                            <option value="VB">VB</option>
-                            <option value="HB">HB</option>
-                            <option value="CB">CB</option>
-                            <option value="LA">LA</option>
-                            <option value="RA">RA</option>
-                            <option value="PL">PL</option>
                             <option value="MV">MV</option>
+                            <option value="M6">M6</option>
+                            <option value="M9">M9</option>
+                            <option value="H6">H6</option>
+                            <option value="H9">H9</option>
+                            <option value="V6">V6</option>
+                            <option value="V9">V9</option>
                         </select>
                     </div>
                 </div>

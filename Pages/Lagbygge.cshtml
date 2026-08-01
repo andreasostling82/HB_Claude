@@ -2,7 +2,7 @@
 @model HB_Claude.Pages.LagbyggeModel
 @using HB_Claude.Models
 @{
-    ViewData["Title"] = "Lagbygge";
+    ViewData["Title"] = "Laghantering";
     Layout = "_Layout";
 }
 
@@ -154,7 +154,10 @@
                                     <td>@sp.Förnamn @sp.Efternamn</td>
                                     <td>@sp.Position</td>
                                     <td>@sp.XNummer</td>
-                                    <td><button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0" onclick="välj('@sp.SpelareID', '@sp.Nummer', '@sp.Förnamn', '@sp.Efternamn', '@sp.Position', '@sp.XNummer')">Välj</button></td>
+                                    <td class="text-nowrap">
+                                        <button type="button" class="btn btn-xs btn-outline-secondary btn-sm py-0" onclick="event.stopPropagation(); välj('@sp.SpelareID', '@sp.Nummer', '@sp.Förnamn', '@sp.Efternamn', '@sp.Position', '@sp.XNummer')">Välj</button>
+                                        <button type="submit" asp-page-handler="RaderaSpelare" formnovalidate class="btn btn-outline-danger btn-sm py-0" title="Ta bort spelare" onclick="event.stopPropagation(); return taBort('@sp.SpelareID', '@sp.Förnamn @sp.Efternamn');">✕</button>
+                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -174,6 +177,13 @@ function välj(id, nummer, fornamn, efternamn, position, xnummer) {
     document.querySelector('[name="SpNummer"]').value = nummer;
     document.querySelector('[name="SpXNummer"]').value = xnummer;
     document.querySelector('[name="SpPosition"]').value = position;
+}
+
+// Ta bort direkt från raden: sätt vald spelare och bekräfta innan formuläret postas.
+function taBort(id, namn) {
+    if (!confirm('Ta bort ' + namn.trim() + '?')) return false;
+    document.getElementById('valtSpelarID').value = id;
+    return true;
 }
 </script>
 }

@@ -58,6 +58,33 @@
 
             <a asp-page="/NyttLag" class="btn btn-sm btn-outline-primary">+ Nytt lag</a>
         </form>
+
+        <hr class="my-3" />
+        <h6>Delad åtkomst</h6>
+        <p class="text-muted small mb-2">Ge någon annan åtkomst till dina lag med sin e-postadress. Saknar de konto skapas ett och lösenordet mailas.</p>
+        <form method="post" class="mb-2">
+            <div class="input-group input-group-sm">
+                <input asp-for="DelegatEpost" type="email" class="form-control" placeholder="namn@epost.se" />
+                <button type="submit" asp-page-handler="BjudIn" class="btn btn-outline-success">Ge åtkomst</button>
+            </div>
+        </form>
+        @if (Model.Delegater.Any())
+        {
+            <ul class="list-group list-group-flush small">
+                @foreach (var d in Model.Delegater)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-1">
+                        <span>@d</span>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="DelegatEpost" value="@d" />
+                            <button type="submit" asp-page-handler="TaBortDelegat"
+                                    class="btn btn-sm btn-outline-danger py-0"
+                                    onclick="return confirm('Ta bort åtkomst för @d?');">Ta bort</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        }
     </div>
 
     <!-- Höger: Spelare -->

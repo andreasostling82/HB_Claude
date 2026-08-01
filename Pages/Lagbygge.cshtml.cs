@@ -26,8 +26,12 @@ public class LagbyggeModel : PageModel
     [BindProperty] public string SpXNummer { get; set; } = "";
     [BindProperty] public string SpPosition { get; set; } = "MV";
 
+    [BindProperty] public string DelegatEpost { get; set; } = "";
+    public List<string> Delegater { get; set; } = new();
+
     public string Meddelande { get; set; } = "";
     private string UserId => HttpContext.Session.GetString("user") ?? "";
+    private string Epost => HttpContext.Session.GetString("epost") ?? "";
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -153,11 +157,69 @@ public class LagbyggeModel : PageModel
         return Page();
     }
 
+    // Ge en e-postadress samma åtkomst till lagen som inloggat konto (delegat).
+    // Skapar ett konto och mailar lösenord om adressen saknar konto.
+    public async Task<IActionResult> OnPostBjudInAsync()
+    {
+        if (string.IsNullOrEmpty(UserId)) return RedirectToPage("/Index");
+        if (string.IsNullOrEmpty(ValtLagID)) ValtLagID = HttpContext.Session.GetString("lag") ?? "";
+
+        var epost = (DelegatEpost ?? "").Trim();
+        if (epost.Length < 5 || !epost.Contains('@'))
+            Meddelande = "Ange en giltig e-postadress.";
+        else if (string.Equals(epost, Epost, StringComparison.OrdinalIgnoreCase))
+            Meddelande = "Du kan inte bjuda in dig själv.";
+        else
+        {
+            var befintlig = await _api.GetUserByEmail(epost);
+            string inviteId;
+            if (befintlig == null)
+            {
+                var pwd = ApiService.RandPwd();
+                var hash = (await _api.GetHash(pwd)).Trim('"');
+                inviteId = await _api.CreateUser(epost, hash);
+                var mailat = _api.SkickaMail(epost, "MatchMate – du har fått åtkomst",
+                    $"Du har fått åtkomst till lagen i MatchMate.\nLogga in med din e-post och lösenordet: {pwd}");
+                Meddelande = mailat
+                    ? $"{epost} har fått åtkomst och ett lösenord har mailats."
+                    : $"{epost} har fått åtkomst. Kunde inte maila lösenordet – be personen använda 'Glömt lösenord'.";
+            }
+            else
+            {
+                inviteId = befintlig.UserID;
+                Meddelande = $"{epost} har nu åtkomst till dina lag.";
+            }
+            await _api.AddDelegate(inviteId, UserId);
+        }
+
+        await LaddaLag();
+        if (!string.IsNullOrEmpty(ValtLagID)) { await FyllLagInfo(); await LaddaSpelare(); }
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostTaBortDelegatAsync()
+    {
+        if (string.IsNullOrEmpty(UserId)) return RedirectToPage("/Index");
+        if (string.IsNullOrEmpty(ValtLagID)) ValtLagID = HttpContext.Session.GetString("lag") ?? "";
+
+        var befintlig = await _api.GetUserByEmail((DelegatEpost ?? "").Trim());
+        if (befintlig != null)
+        {
+            await _api.RemoveDelegate(befintlig.UserID, UserId);
+            Meddelande = $"{befintlig.UserName} har inte längre åtkomst.";
+        }
+
+        await LaddaLag();
+        if (!string.IsNullOrEmpty(ValtLagID)) { await FyllLagInfo(); await LaddaSpelare(); }
+        return Page();
+    }
+
     private async Task LaddaLag()
     {
         LagLista = await _api.GetLagFromUser(UserId) ?? new();
         if (string.IsNullOrEmpty(ValtLagID) && LagLista.Any())
             ValtLagID = LagLista.First().LagID;
+        Delegater = await _api.GetDelegatesFor(UserId);
     }
 
     private async Task FyllLagInfo()

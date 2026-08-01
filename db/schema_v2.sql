@@ -39,6 +39,7 @@ CREATE TABLE app_user (             -- var MM_Users
     password_hash  VARCHAR(255) NULL,                                -- var Password
     role           TINYINT UNSIGNED NOT NULL,                        -- var typ (1/2)
     status         VARCHAR(10)  NOT NULL DEFAULT 'aktiv',
+    last_login     DATETIME     NULL,                             -- senaste lyckade inloggning
     created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_app_user_email (email)                             -- Password2 slopad (redundant)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_swedish_ci;

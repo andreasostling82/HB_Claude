@@ -150,6 +150,21 @@ public class EventsModel : PageModel
         return Page();
     }
 
+    public async Task<IActionResult> OnPostSpelstoppAsync()
+    {
+        if (string.IsNullOrEmpty(UserId)) return RedirectToPage("/Index");
+        SparaSesstion();
+
+        var matchId = HttpContext.Session.GetString("match") ?? ValtMatchID;
+        if (string.IsNullOrEmpty(matchId)) { Felmeddelande = "Ingen match vald!"; await LaddaAllt(); return Page(); }
+
+        // Spelstopp kräver ingen spelare – lagras som en matchhändelse.
+        await _api.AddSpelstopp(matchId, MatchTid.ToString());
+
+        await LaddaAllt();
+        return Page();
+    }
+
     private Händelse BuildHändelse(string matchId, string spId)
     {
         var rawTyp = HandelseTyp;
@@ -303,6 +318,7 @@ public class EventsModel : PageModel
     {
         try
         {
+            var antStopp = await _api.GetSpelstoppCount(matchId);
             var mv = await _api.GetMalvakt(matchId);
             if (mv != null && mv.Any())
             {
@@ -313,7 +329,7 @@ public class EventsModel : PageModel
                 var mvRadd = mv[0].Raddningar;
                 var pct = double.TryParse((mv[0].Procent ?? "0").Replace(".", ","), out var p) ? p : 0;
                 var avslutPct = antA > 0 ? (double)antM / antA : 0;
-                SummaryText = $"Mål: {antM} - {mvMal}  Avslut: {antA} ({avslutPct:P0})  Räddningar: {mvRadd} ({pct:P0})  Fel: {antF}";
+                SummaryText = $"Mål: {antM} - {mvMal}  Avslut: {antA} ({avslutPct:P0})  Räddningar: {mvRadd} ({pct:P0})  Fel: {antF}  Spelstopp: {antStopp}";
             }
         }
         catch { }
@@ -379,6 +395,10 @@ public class EventsModel : PageModel
                     case "startmarker":
                         // No-op: startmarkören har ingen effekt i v2 (och bröt FK). Bekräftas
                         // så att ev. gamla köade startmarkörer rensas ur klientens kö.
+                        break;
+
+                    case "spelstopp":
+                        await _api.AddSpelstopp(op.MatchId, op.Tids, op.ClientId);
                         break;
 
                     default: // "event"

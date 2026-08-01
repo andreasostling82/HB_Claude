@@ -203,6 +203,130 @@ public class ApiService
         return true;
     }
 
+    // ---- Testkonto (login utan lösenord + demodata) ----
+
+    // E-post för det publika testkontot. Lösenordshashen sätts till ett värde som
+    // aldrig kan matcha ett riktigt lösenord, så kontot bara nås via testknappen.
+    public const string TestEmail = "testkonto@matchmate.se";
+
+    // Hämtar testkontot, skapar det om det saknas. Returnerar id + roll.
+    public async Task<User> EnsureTestAccount()
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using (var find = new MySqlCommand(
+            "SELECT id, role FROM app_user WHERE email=@e LIMIT 1;", connection))
+        {
+            find.Parameters.AddWithValue("@e", TestEmail);
+            await using var r = await find.ExecuteReaderAsync();
+            if (await r.ReadAsync())
+                return new User { UserID = r["id"].ToString() ?? "", typ = r["role"].ToString() ?? "1", UserName = TestEmail };
+        }
+        await using (var ins = new MySqlCommand(
+            "INSERT INTO app_user (email, password_hash, role, status) VALUES (@e, @p, '1', 'aktiv');", connection))
+        {
+            ins.Parameters.AddWithValue("@e", TestEmail);
+            ins.Parameters.AddWithValue("@p", "TESTKONTO_INGEN_INLOGGNING_" + Guid.NewGuid().ToString("N"));
+            await ins.ExecuteNonQueryAsync();
+            return new User { UserID = ins.LastInsertedId.ToString(), typ = "1", UserName = TestEmail };
+        }
+    }
+
+    // Seedar testlag, testspelare, testmatcher och några matchhändelser om kontot
+    // saknar lag. Självläkande: körs varje gång testknappen används men gör inget
+    // om data redan finns, så testarnas ändringar bevaras tills laget töms.
+    public async Task SeedTestDataIfEmpty(string userId)
+    {
+        await using var conn = new MySqlConnection(ConnStr);
+        await conn.OpenAsync();
+
+        await using (var chk = new MySqlCommand("SELECT COUNT(*) FROM team WHERE user_id=@u;", conn))
+        {
+            chk.Parameters.AddWithValue("@u", userId);
+            if (Convert.ToInt64(await chk.ExecuteScalarAsync()) > 0) return;
+        }
+
+        async Task<long> Exec(string sql, params (string, object)[] ps)
+        {
+            await using var c = new MySqlCommand(sql, conn);
+            foreach (var (n, v) in ps) c.Parameters.AddWithValue(n, v);
+            await c.ExecuteNonQueryAsync();
+            return c.LastInsertedId;
+        }
+
+        Task<long> AddTeam(string namn, string hall, string serie, string kat) =>
+            Exec("INSERT INTO team (name, home_venue, series, user_id, category) VALUES (@n,@h,@s,@u,@k);",
+                ("@n", namn), ("@h", hall), ("@s", serie), ("@u", userId), ("@k", kat));
+
+        Task<long> AddPlayer(long teamId, string fn, string en, int nr, string pos) =>
+            Exec("INSERT INTO player (team_id, first_name, last_name, position, shirt_number) VALUES (@t,@f,@e,@p,@n);",
+                ("@t", teamId), ("@f", fn), ("@e", en), ("@p", pos), ("@n", nr));
+
+        Task<long> AddGame(long teamId, string datum, string mots, string plats, string status) =>
+            Exec("INSERT INTO game (played_on, team_id, opponent, venue, status) VALUES (@d,@t,@o,@v,@s);",
+                ("@d", datum), ("@t", teamId), ("@o", mots), ("@v", plats), ("@s", status));
+
+        Task<long> AddEvent(long gameId, long playerId, int typ, int zon, int fas, int sek) =>
+            Exec("INSERT INTO game_event (game_id, player_id, event_type_id, phase_id, zone_id, seconds) VALUES (@g,@p,@t,@f,@z,@s);",
+                ("@g", gameId), ("@p", playerId), ("@t", typ), ("@f", fas), ("@z", zon), ("@s", sek));
+
+        int[] goalTypes = { 15, 20, 36 }; // _Mål_, _9m, _6m (is_goal=1)
+        const int miss = 14;              // _Utanför
+        const int save = 16;              // Räddning_
+
+        // Fyller en avslutad match med avslut (mål + missar) för utespelarna och
+        // några räddningar för målvakten (index 0). pl[0] = MV.
+        async Task SeedEvents(long g, List<long> pl)
+        {
+            int sek = 60;
+            for (int i = 1; i < pl.Count; i++)
+            {
+                await AddEvent(g, pl[i], goalTypes[i % goalTypes.Length], 1 + (i % 5), 1 + (i % 3), sek); sek += 45;
+                await AddEvent(g, pl[i], miss, 1 + ((i + 2) % 5), 1 + ((i + 1) % 3), sek); sek += 40;
+            }
+            await AddEvent(g, pl[0], save, 1, 1, sek); sek += 30;
+            await AddEvent(g, pl[0], save, 2, 2, sek);
+        }
+
+        // Lag 1 – Herr
+        var t1 = await AddTeam("Testlaget Herr", "Testhallen", "Division 3", "M");
+        var p1 = new List<long>
+        {
+            await AddPlayer(t1, "Anders", "Målberg", 1, "MV"),
+            await AddPlayer(t1, "Erik", "Vänsterström", 7, "V9"),
+            await AddPlayer(t1, "Johan", "Högberg", 9, "H9"),
+            await AddPlayer(t1, "Karl", "Mittfelt", 10, "M9"),
+            await AddPlayer(t1, "Sven", "Linjeman", 4, "M6"),
+            await AddPlayer(t1, "Olof", "Kantberg", 11, "V6"),
+            await AddPlayer(t1, "Nils", "Backman", 5, "H6"),
+            await AddPlayer(t1, "Per", "Skytt", 8, "M9"),
+        };
+
+        // Lag 2 – Dam
+        var t2 = await AddTeam("Testlaget Dam", "Testhallen", "Division 2", "W");
+        var p2 = new List<long>
+        {
+            await AddPlayer(t2, "Sofia", "Målqvist", 1, "MV"),
+            await AddPlayer(t2, "Emma", "Vänsterlund", 7, "V9"),
+            await AddPlayer(t2, "Klara", "Högström", 9, "H9"),
+            await AddPlayer(t2, "Maja", "Mittberg", 10, "M9"),
+            await AddPlayer(t2, "Alva", "Linjqvist", 4, "M6"),
+            await AddPlayer(t2, "Wilma", "Kantell", 11, "V6"),
+        };
+
+        // Matcher – lag 1 (två avslutade med händelser, en planerad)
+        var g1 = await AddGame(t1, "2026-04-20", "HK Rival", "Testhallen", "Avslutad");
+        var g2 = await AddGame(t1, "2026-05-10", "IK Motstånd", "Bortahallen", "Avslutad");
+        await AddGame(t1, "2026-05-24", "BK Framtid", "Testhallen", "Planerad");
+        await SeedEvents(g1, p1);
+        await SeedEvents(g2, p1);
+
+        // Matcher – lag 2 (en avslutad med händelser, en planerad)
+        var g3 = await AddGame(t2, "2026-04-28", "HF Syd", "Bortahallen", "Avslutad");
+        await AddGame(t2, "2026-05-12", "Dam IF", "Testhallen", "Planerad");
+        await SeedEvents(g3, p2);
+    }
+
     // ---- Lag (Teams) ----
 
     private async Task<List<Lag>> GetTeams(string userId)

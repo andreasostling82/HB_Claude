@@ -32,6 +32,10 @@
                     <a class="nav-link" asp-page="/Lagbygge" style="color: var(--text2)">Lagbygge</a>
                     <a class="nav-link" asp-page="/Stats" style="color: var(--text2)">Matchstatistik</a>
                     <a class="nav-link" asp-page="/Sasongsstat" style="color: var(--text2)">Säsong</a>
+                    @if (HB_Claude.Pages.AdminModel.ÄrAdmin(Context.Session.GetString("epost")))
+                    {
+                        <a class="nav-link" asp-page="/Admin" style="color: var(--text2)">Konton</a>
+                    }
                     <a class="nav-link" asp-page="/BytLosenord" style="color: var(--text2)">Byt lösenord</a>
                     <a class="nav-link" asp-page="/Logout" style="color: var(--red)">Logga ut</a>
                 </div>

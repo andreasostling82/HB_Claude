@@ -1,0 +1,69 @@
+@page
+@model HB_Claude.Pages.AdminModel
+@{
+    ViewData["Title"] = "Kontoöversikt";
+    Layout = "_Layout";
+}
+
+<h4 class="mb-3">Kontoöversikt</h4>
+
+<div class="row g-2 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body py-3">
+                <div class="fs-3 fw-bold">@Model.TotaltKonton</div>
+                <div class="text-muted small">Konton totalt</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body py-3">
+                <div class="fs-3 fw-bold">@Model.KontonMedLag</div>
+                <div class="text-muted small">Konton med lag</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body py-3">
+                <div class="fs-3 fw-bold">@Model.TotaltLag</div>
+                <div class="text-muted small">Lag totalt</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body py-3">
+                <div class="fs-3 fw-bold">@Model.TotaltMatcher</div>
+                <div class="text-muted small">Matcher totalt</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Konto</th>
+                <th>Status</th>
+                <th class="text-end">Lag</th>
+                <th class="text-end">Matcher</th>
+                <th class="text-end">Spelade</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var k in Model.Konton)
+            {
+                <tr>
+                    <td>@k.Epost</td>
+                    <td><span class="badge bg-secondary">@k.Status</span></td>
+                    <td class="text-end">@k.AntalLag</td>
+                    <td class="text-end">@k.AntalMatcher</td>
+                    <td class="text-end">@k.Spelade</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

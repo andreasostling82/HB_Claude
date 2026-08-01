@@ -337,21 +337,141 @@ public class ApiService
         await using var connection = new MySqlConnection(ConnStr);
         await connection.OpenAsync();
         await using var cmd = new MySqlCommand(
-            "SELECT u.email, u.status, " +
+            "SELECT u.email, u.status, u.last_login, " +
             "(SELECT COUNT(*) FROM team t WHERE t.user_id=u.id) AS antal_lag, " +
             "(SELECT COUNT(*) FROM game g JOIN team t ON t.id=g.team_id WHERE t.user_id=u.id) AS antal_matcher, " +
             "(SELECT COUNT(*) FROM game g JOIN team t ON t.id=g.team_id WHERE t.user_id=u.id AND g.status='Avslutad') AS spelade " +
-            "FROM app_user u ORDER BY antal_matcher DESC, antal_lag DESC, u.email;", connection);
+            "FROM app_user u ORDER BY u.last_login IS NULL, u.last_login DESC, antal_matcher DESC;", connection);
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
             list.Add(new KontoRad
             {
                 Epost = reader["email"].ToString() ?? "",
                 Status = reader["status"].ToString() ?? "",
+                SenastAnvänd = reader["last_login"] == DBNull.Value ? null : Convert.ToDateTime(reader["last_login"]),
                 AntalLag = Convert.ToInt32(reader["antal_lag"]),
                 AntalMatcher = Convert.ToInt32(reader["antal_matcher"]),
                 Spelade = Convert.ToInt32(reader["spelade"])
             });
+        return list;
+    }
+
+    // Uppdaterar senaste inloggning för det konto som faktiskt loggade in (via e-post).
+    public async Task TouchLastLogin(string email)
+    {
+        if (string.IsNullOrEmpty(email)) return;
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "UPDATE app_user SET last_login=NOW() WHERE replace(email,'+','')=@e;", connection);
+        cmd.Parameters.AddWithValue("@e", email);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    // Sätter status (t.ex. 'aktiv' / 'inaktiv') för ett konto.
+    public async Task SetUserStatus(string email, string status)
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "UPDATE app_user SET status=@s WHERE email=@e;", connection);
+        cmd.Parameters.AddWithValue("@s", status);
+        cmd.Parameters.AddWithValue("@e", email);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    // Raderar ett konto och all dess data. Lagen tas bort först (kaskad tar
+    // spelare, matcher och händelser); user_delegate-rader kaskadraderas när
+    // kontot tas bort.
+    public async Task DeleteUserCascade(string email)
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using (var delTeams = new MySqlCommand(
+            "DELETE t FROM team t JOIN app_user u ON u.id=t.user_id WHERE u.email=@e;", connection))
+        {
+            delTeams.Parameters.AddWithValue("@e", email);
+            await delTeams.ExecuteNonQueryAsync();
+        }
+        await using (var delUser = new MySqlCommand("DELETE FROM app_user WHERE email=@e;", connection))
+        {
+            delUser.Parameters.AddWithValue("@e", email);
+            await delUser.ExecuteNonQueryAsync();
+        }
+    }
+
+    // ---- Delegater (delad laguppsättning) ----
+
+    // Hämtar konto via e-post (id + status), eller null om det saknas.
+    public async Task<User?> GetUserByEmail(string email)
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "SELECT id, email, status, role FROM app_user WHERE replace(email,'+','')=@e LIMIT 1;", connection);
+        cmd.Parameters.AddWithValue("@e", email);
+        await using var r = await cmd.ExecuteReaderAsync();
+        if (!await r.ReadAsync()) return null;
+        return new User
+        {
+            UserID = r["id"].ToString() ?? "",
+            UserName = r["email"].ToString() ?? "",
+            status = r["status"].ToString() ?? "",
+            typ = r["role"].ToString() ?? ""
+        };
+    }
+
+    // Skapar ett nytt konto och returnerar dess id.
+    public async Task<string> CreateUser(string email, string passwordHash, string role = "2")
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "INSERT INTO app_user (email, password_hash, role, status) VALUES (@e, @p, @r, 'aktiv');", connection);
+        cmd.Parameters.AddWithValue("@e", email.Replace("+", ""));
+        cmd.Parameters.AddWithValue("@p", passwordHash);
+        cmd.Parameters.AddWithValue("@r", role);
+        await cmd.ExecuteNonQueryAsync();
+        return cmd.LastInsertedId.ToString();
+    }
+
+    // Ger kontot inviteUserId åtkomst att agera som effectiveUserId (delad
+    // laguppsättning). När inviteUserId loggar in resolvas hen till effectiveUserId.
+    public async Task AddDelegate(string inviteUserId, string effectiveUserId)
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "INSERT IGNORE INTO user_delegate (user_id, delegate_user_id) VALUES (@u, @d);", connection);
+        cmd.Parameters.AddWithValue("@u", inviteUserId);
+        cmd.Parameters.AddWithValue("@d", effectiveUserId);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    // Tar bort en delegatåtkomst.
+    public async Task RemoveDelegate(string inviteUserId, string effectiveUserId)
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "DELETE FROM user_delegate WHERE user_id=@u AND delegate_user_id=@d;", connection);
+        cmd.Parameters.AddWithValue("@u", inviteUserId);
+        cmd.Parameters.AddWithValue("@d", effectiveUserId);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    // E-postadresser som har delad åtkomst till effectiveUserId:s lag.
+    public async Task<List<string>> GetDelegatesFor(string effectiveUserId)
+    {
+        var list = new List<string>();
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "SELECT u.email FROM user_delegate d JOIN app_user u ON u.id=d.user_id " +
+            "WHERE d.delegate_user_id=@d ORDER BY u.email;", connection);
+        cmd.Parameters.AddWithValue("@d", effectiveUserId);
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync()) list.Add(r["email"].ToString() ?? "");
         return list;
     }
 

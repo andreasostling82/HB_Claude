@@ -31,6 +31,7 @@ public class KontoRad
 {
     public string Epost { get; set; } = "";
     public string Status { get; set; } = "";
+    public DateTime? SenastAnvänd { get; set; }
     public int AntalLag { get; set; }
     public int AntalMatcher { get; set; }
     public int Spelade { get; set; }

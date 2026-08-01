@@ -26,6 +26,9 @@ public class AdminModel : PageModel
     public static bool ÄrAdmin(string? epost) =>
         epost != null && AdminEpost.Contains(epost, StringComparer.OrdinalIgnoreCase);
 
+    [BindProperty] public string MalEpost { get; set; } = "";
+    public string Meddelande { get; set; } = "";
+
     public async Task<IActionResult> OnGetAsync()
     {
         if (string.IsNullOrEmpty(HttpContext.Session.GetString("user")))
@@ -35,5 +38,43 @@ public class AdminModel : PageModel
 
         Konton = await _api.GetKontoOversikt();
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostStatusAsync(string status)
+    {
+        if (!await GateAsync()) return RedirectToPage("/Index");
+        if (ÄrAdmin(MalEpost))
+            Meddelande = "Administratörskonton kan inte inaktiveras.";
+        else
+        {
+            var nyStatus = status == "inaktiv" ? "inaktiv" : "aktiv";
+            await _api.SetUserStatus(MalEpost, nyStatus);
+            Meddelande = $"{MalEpost} är nu {nyStatus}.";
+        }
+        Konton = await _api.GetKontoOversikt();
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostRaderaAsync()
+    {
+        if (!await GateAsync()) return RedirectToPage("/Index");
+        if (ÄrAdmin(MalEpost))
+            Meddelande = "Administratörskonton kan inte raderas.";
+        else
+        {
+            await _api.DeleteUserCascade(MalEpost);
+            Meddelande = $"{MalEpost} och kontots data har raderats.";
+        }
+        Konton = await _api.GetKontoOversikt();
+        return Page();
+    }
+
+    // Returnerar false om aktuell session inte är en inloggad admin.
+    private async Task<bool> GateAsync()
+    {
+        if (string.IsNullOrEmpty(HttpContext.Session.GetString("user")) || !ÄrAdmin(Epost))
+            return false;
+        await Task.CompletedTask;
+        return true;
     }
 }

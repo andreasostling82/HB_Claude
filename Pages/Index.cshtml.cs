@@ -46,6 +46,13 @@ public class IndexModel : PageModel
             return Page();
         }
 
+        if (!string.Equals(us.status, "aktiv", StringComparison.OrdinalIgnoreCase))
+        {
+            Felmeddelande = "Kontot är inaktiverat. Kontakta administratören.";
+            return Page();
+        }
+
+        await _api.TouchLastLogin(us.UserName);
         HttpContext.Session.SetString("user", us.UserID);
         HttpContext.Session.SetString("typ", us.typ);
         HttpContext.Session.SetString("epost", us.UserName);
@@ -58,6 +65,7 @@ public class IndexModel : PageModel
     {
         var u = await _api.EnsureTestAccount();
         await _api.SeedTestDataIfEmpty(u.UserID);
+        await _api.TouchLastLogin(u.UserName);
         HttpContext.Session.SetString("user", u.UserID);
         HttpContext.Session.SetString("typ", string.IsNullOrEmpty(u.typ) ? "1" : u.typ);
         HttpContext.Session.SetString("epost", u.UserName);

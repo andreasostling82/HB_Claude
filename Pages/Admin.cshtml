@@ -7,6 +7,11 @@
 
 <h4 class="mb-3">Kontoöversikt</h4>
 
+@if (!string.IsNullOrEmpty(Model.Meddelande))
+{
+    <div class="alert alert-info py-2">@Model.Meddelande</div>
+}
+
 <div class="row g-2 mb-4">
     <div class="col-6 col-md-3">
         <div class="card text-center shadow-sm">
@@ -48,20 +53,48 @@
             <tr>
                 <th>Konto</th>
                 <th>Status</th>
+                <th>Senast använd</th>
                 <th class="text-end">Lag</th>
                 <th class="text-end">Matcher</th>
                 <th class="text-end">Spelade</th>
+                <th class="text-end">Åtgärder</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var k in Model.Konton)
             {
-                <tr>
+                var aktiv = string.Equals(k.Status, "aktiv", System.StringComparison.OrdinalIgnoreCase);
+                var ärAdminKonto = HB_Claude.Pages.AdminModel.ÄrAdmin(k.Epost);
+                <tr class="@(aktiv ? "" : "table-warning")">
                     <td>@k.Epost</td>
-                    <td><span class="badge bg-secondary">@k.Status</span></td>
+                    <td><span class="badge @(aktiv ? "bg-success" : "bg-secondary")">@k.Status</span></td>
+                    <td>@(k.SenastAnvänd?.ToString("yyyy-MM-dd HH:mm") ?? "Aldrig")</td>
                     <td class="text-end">@k.AntalLag</td>
                     <td class="text-end">@k.AntalMatcher</td>
                     <td class="text-end">@k.Spelade</td>
+                    <td class="text-end text-nowrap">
+                        @if (!ärAdminKonto)
+                        {
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="MalEpost" value="@k.Epost" />
+                                @if (aktiv)
+                                {
+                                    <button type="submit" asp-page-handler="Status" name="status" value="inaktiv"
+                                            class="btn btn-sm btn-outline-warning py-0">Inaktivera</button>
+                                }
+                                else
+                                {
+                                    <button type="submit" asp-page-handler="Status" name="status" value="aktiv"
+                                            class="btn btn-sm btn-outline-success py-0">Aktivera</button>
+                                }
+                            </form>
+                            <form method="post" class="d-inline"
+                                  onsubmit="return confirm('Radera @k.Epost och ALL kontots data (lag, spelare, matcher)? Detta går inte att ångra.');">
+                                <input type="hidden" name="MalEpost" value="@k.Epost" />
+                                <button type="submit" asp-page-handler="Radera" class="btn btn-sm btn-outline-danger py-0">Radera</button>
+                            </form>
+                        }
+                    </td>
                 </tr>
             }
         </tbody>

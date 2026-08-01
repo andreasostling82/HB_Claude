@@ -113,6 +113,36 @@
         </div>
     }
 
+    <!-- Spelstopp -->
+    @if (Model.ValtSpelarID == "0" || string.IsNullOrEmpty(Model.ValtSpelarID))
+    {
+        <h6 class="mt-3">Spelstopp</h6>
+        <div class="table-responsive mb-3" style="max-width: 520px;">
+            <table class="table table-sm table-striped small">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Antal spelstopp</th>
+                        <th>Spelstopp / gjorda mål</th>
+                        <th>Spelstopp / insläppta mål</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>@Model.Spelstopp</td>
+                        <td>
+                            @Model.Spelstopp / @Model.MålGjorda
+                            @(Model.MålGjorda > 0 ? $"({(double)Model.Spelstopp / Model.MålGjorda:0.00})" : "")
+                        </td>
+                        <td>
+                            @Model.Spelstopp / @Model.MålInsläppta
+                            @(Model.MålInsläppta > 0 ? $"({(double)Model.Spelstopp / Model.MålInsläppta:0.00})" : "")
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    }
+
     <!-- Sammanfattning -->
     @if (Model.SammanfattningLista.Any())
     {

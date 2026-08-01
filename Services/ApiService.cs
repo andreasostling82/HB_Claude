@@ -273,7 +273,7 @@ public class ApiService
             await using var cmd = new MySqlCommand(
                 "SELECT id AS SpelarID, team_id AS LagID, first_name AS Förnamn, last_name AS Efternamn, position AS Position, " +
                 "CASE WHEN alt_shirt_number IS NULL THEN shirt_number ELSE alt_shirt_number END AS Nummer " +
-                "FROM player WHERE team_id=@LagID " +
+                "FROM player WHERE team_id=@LagID AND position<>'SYS' " +
                 "ORDER BY CASE WHEN position='MV' THEN 0 ELSE 1 END, " +
                 "CASE WHEN alt_shirt_number IS NULL THEN shirt_number ELSE alt_shirt_number END ASC;", connection);
             cmd.Parameters.AddWithValue("@LagID", lagId);
@@ -302,7 +302,7 @@ public class ApiService
             await connection.OpenAsync();
             await using var cmd = new MySqlCommand(
                 "SELECT id AS SpelarID, team_id AS LagID, first_name AS Förnamn, last_name AS Efternamn, position AS Position, " +
-                "alt_shirt_number AS XNummer, shirt_number AS Nummer FROM player WHERE team_id=@LagID;", connection);
+                "alt_shirt_number AS XNummer, shirt_number AS Nummer FROM player WHERE team_id=@LagID AND position<>'SYS';", connection);
             cmd.Parameters.AddWithValue("@LagID", lagId);
             await using var reader = await cmd.ExecuteReaderAsync();
             var list = new List<Spelare>();
@@ -530,6 +530,96 @@ public class ApiService
         return true;
     }
 
+    // Spelstopp är en lag-/matchhändelse utan spelare. game_event.player_id är dock
+    // NOT NULL med FK, så vi ankrar händelsen på en dold "systemspelare" (position 'SYS')
+    // som skapas per lag vid behov. Systemspelaren filtreras bort ur alla spelarlistor
+    // och statistik-queries (WHERE position<>'SYS'), så den syns aldrig i appen.
+    private async Task<string> EnsureSystemPlayer(MySqlConnection connection, string teamId)
+    {
+        await using (var find = new MySqlCommand(
+            "SELECT id FROM player WHERE team_id=@t AND position='SYS' LIMIT 1;", connection))
+        {
+            find.Parameters.AddWithValue("@t", teamId);
+            var existing = (await find.ExecuteScalarAsync())?.ToString();
+            if (!string.IsNullOrEmpty(existing)) return existing;
+        }
+
+        await using (var ins = new MySqlCommand(
+            "INSERT INTO player (team_id, first_name, last_name, position, shirt_number) " +
+            "VALUES (@t, 'System', 'Spelstopp', 'SYS', 0);", connection))
+        {
+            ins.Parameters.AddWithValue("@t", teamId);
+            await ins.ExecuteNonQueryAsync();
+            return ins.LastInsertedId.ToString();
+        }
+    }
+
+    private async Task<string> EnsureSpelstoppEventType(MySqlConnection connection)
+    {
+        await using (var find = new MySqlCommand(
+            "SELECT id FROM event_type WHERE `text`='Spelstopp' LIMIT 1;", connection))
+        {
+            var existing = (await find.ExecuteScalarAsync())?.ToString();
+            if (!string.IsNullOrEmpty(existing)) return existing;
+        }
+        // event_type.id är inte auto_increment (fasta koder) => beräkna nästa id.
+        await using (var ins = new MySqlCommand(
+            "INSERT INTO event_type (id, `text`, is_goal) " +
+            "SELECT COALESCE(MAX(id),0)+1, 'Spelstopp', 0 FROM event_type " +
+            "WHERE NOT EXISTS (SELECT 1 FROM event_type WHERE `text`='Spelstopp');", connection))
+        {
+            await ins.ExecuteNonQueryAsync();
+        }
+        await using (var re = new MySqlCommand(
+            "SELECT id FROM event_type WHERE `text`='Spelstopp' LIMIT 1;", connection))
+        {
+            return (await re.ExecuteScalarAsync())?.ToString() ?? "0";
+        }
+    }
+
+    public async Task<bool> AddSpelstopp(string matchId, string tids, string? clientEventId = null)
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+
+        // Härled lag från matchen och säkerställ systemspelare + händelsetyp.
+        string teamId;
+        await using (var t = new MySqlCommand("SELECT team_id FROM game WHERE id=@g LIMIT 1;", connection))
+        {
+            t.Parameters.AddWithValue("@g", matchId);
+            teamId = (await t.ExecuteScalarAsync())?.ToString() ?? "";
+        }
+        if (string.IsNullOrEmpty(teamId)) return false;
+
+        var playerId = await EnsureSystemPlayer(connection, teamId);
+        var hanID = await EnsureSpelstoppEventType(connection);
+
+        // client_event_id (offline-synk) gör inserten idempotent – se AddHändelse.
+        await using var cmd = new MySqlCommand(
+            "INSERT INTO game_event (seconds, game_id, player_id, event_type_id, phase_id, zone_id, client_event_id) " +
+            "VALUES (@Tids, @MatchID, @SpelareID, @HändelseID, 0, 0, @Cid) " +
+            "ON DUPLICATE KEY UPDATE client_event_id = client_event_id;", connection);
+        cmd.Parameters.AddWithValue("@Tids", tids);
+        cmd.Parameters.AddWithValue("@MatchID", matchId);
+        cmd.Parameters.AddWithValue("@SpelareID", playerId);
+        cmd.Parameters.AddWithValue("@HändelseID", hanID);
+        cmd.Parameters.AddWithValue("@Cid", string.IsNullOrEmpty(clientEventId) ? DBNull.Value : clientEventId);
+        await cmd.ExecuteNonQueryAsync();
+        return true;
+    }
+
+    public async Task<int> GetSpelstoppCount(string matchId)
+    {
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "SELECT COUNT(*) FROM game_event H JOIN event_type HL ON HL.id=H.event_type_id " +
+            "WHERE H.game_id=@MatchID AND HL.`text`='Spelstopp';", connection);
+        cmd.Parameters.AddWithValue("@MatchID", matchId);
+        var r = await cmd.ExecuteScalarAsync();
+        return r == null || r == DBNull.Value ? 0 : Convert.ToInt32(r);
+    }
+
     public async Task<List<EventsTyp>?> AddMultiHändelse3(Händelse händelse, string? clientEventId = null)
     {
         await using var connection = new MySqlConnection(ConnStr);
@@ -582,7 +672,7 @@ public class ApiService
         }
 
         const string sql = "SELECT TIME_FORMAT(SEC_TO_TIME(H.seconds),'%i:%s') Tid, " +
-            "concat(S.shirt_number,' ',S.last_name) AS namn, H.phase_id Fas, Z.name Zon, " +
+            "CASE WHEN S.position='SYS' THEN '' ELSE concat(S.shirt_number,' ',S.last_name) END AS namn, H.phase_id Fas, Z.name Zon," +
             "CASE WHEN HL.`text` LIKE 'Uppst%' THEN 'Uppst' WHEN HL.`text` LIKE 'Fas1%' THEN 'Fas1' WHEN HL.`text` LIKE 'Fas2%' THEN 'Fas2' " +
             "WHEN HL.`text` LIKE 'TeknisktFel%' THEN 'TeknisktFel' WHEN HL.`text` LIKE 'Straff%' THEN 'Straff' ELSE '' END AS Typ, " +
             "replace(replace(replace(replace(replace(replace(replace(replace(replace(HL.`text`,'_6','6'),'_9','9'),'_mål','mål'),'_Utanf','Utanf'),'ur_','ur'),'UppstUtanför_','Uppst_Utanför'),'__','_'),'Uppst_Straff_Mål_','Uppst_Straff_Mål'),'_',' ') AS Text, " +
@@ -616,7 +706,7 @@ public class ApiService
     public async Task<List<EventsTyp>?> GetHandelseUppdelad2(string matchId)
     {
         const string sql =
-            "SELECT TIME_FORMAT(SEC_TO_TIME(H.seconds),'%i:%s') Tid, concat(S.shirt_number,' ',S.last_name) AS namn, H.phase_id Fas, Z.name Zon, " +
+            "SELECT TIME_FORMAT(SEC_TO_TIME(H.seconds),'%i:%s') Tid, CASE WHEN S.position='SYS' THEN '' ELSE concat(S.shirt_number,' ',S.last_name) END AS namn, H.phase_id Fas, Z.name Zon," +
             "CASE WHEN HL.`text` LIKE 'Uppst%' THEN 'Uppst' WHEN HL.`text` LIKE 'Fas1%' THEN 'Fas1' WHEN HL.`text` LIKE 'Fas2%' THEN 'Fas2' " +
             "WHEN HL.`text` LIKE 'TeknisktFel%' THEN 'TeknisktFel' WHEN HL.`text` LIKE 'Straff%' THEN 'Straff' ELSE '' END AS Typ, " +
             "replace(replace(replace(replace(replace(replace(replace(replace(replace(HL.`text`,'_6','6'),'_9','9'),'_mål','mål'),'_Utanf','Utanf'),'ur_','ur'),'UppstUtanför_','Uppst_Utanför'),'__','_'),'Uppst_Straff_Mål_','Uppst_Straff_Mål'),'_',' ') AS Text, " +
@@ -661,7 +751,7 @@ public class ApiService
             "sum(CASE WHEN S.position='MV' THEN 0 ELSE CASE WHEN HL.`text` LIKE '%mål%' THEN 1 WHEN HL.`text` LIKE '%_6m%' THEN 1 WHEN HL.`text` LIKE '%_9m%' THEN 1 WHEN HL.`text` LIKE '%Genombrott%' THEN 1 WHEN HL.`text` LIKE '%Utanför%' THEN 1 WHEN HL.`text` LIKE '%Räddning%' THEN 1 WHEN HL.`text` LIKE '%Skott_i_täcket%' THEN 1 ELSE 0 END END) AS Målperavslut, " +
             "S.position Position FROM event_type HL JOIN game_event H ON H.event_type_id=HL.id " +
             "JOIN player S ON S.id=H.player_id JOIN zone Z ON Z.id=H.zone_id " +
-            "WHERE H.game_id=@MatchID GROUP BY concat(S.shirt_number,' ',S.last_name), S.position ORDER BY concat(S.shirt_number,' ',S.last_name);";
+            "WHERE H.game_id=@MatchID AND S.position<>'SYS' GROUP BY concat(S.shirt_number,' ',S.last_name), S.position ORDER BY concat(S.shirt_number,' ',S.last_name);";
         await using var connection = new MySqlConnection(ConnStr);
         await connection.OpenAsync();
         await using var cmd = new MySqlCommand(sql, connection);
@@ -692,7 +782,7 @@ public class ApiService
             "sum(CASE WHEN HL.`text` LIKE '%mål%' THEN 1 WHEN HL.`text` LIKE '%_6m%' THEN 1 WHEN HL.`text` LIKE '%_9m%' THEN 1 WHEN HL.`text` LIKE '%Genombrott%' THEN 1 WHEN HL.`text` LIKE '%Utanför%' THEN 1 WHEN HL.`text` LIKE '%Räddning%' THEN 1 WHEN HL.`text` LIKE '%Skott_i_täcket%' THEN 1 ELSE 0 END) AS Målperavslut, " +
             "S.position Position FROM event_type HL JOIN game_event H ON H.event_type_id=HL.id " +
             "JOIN player S ON S.id=H.player_id JOIN zone Z ON Z.id=H.zone_id " +
-            "WHERE S.position<>'MV' AND H.game_id=@MatchID GROUP BY concat(S.shirt_number,' ',S.last_name), S.position ORDER BY concat(S.shirt_number,' ',S.last_name);";
+            "WHERE S.position NOT IN ('MV','SYS') AND H.game_id=@MatchID GROUP BY concat(S.shirt_number,' ',S.last_name), S.position ORDER BY concat(S.shirt_number,' ',S.last_name);";
         await using var connection = new MySqlConnection(ConnStr);
         await connection.OpenAsync();
         await using var cmd = new MySqlCommand(sql, connection);
@@ -846,7 +936,7 @@ public class ApiService
             "sum(CASE WHEN HL.`text` LIKE '%mål%' THEN 1 WHEN HL.`text` LIKE '%_6m%' THEN 1 WHEN HL.`text` LIKE '%_9m%' THEN 1 WHEN HL.`text` LIKE '%Genombrott%' THEN 1 " +
             "WHEN HL.`text` LIKE '%Räddning%' THEN 1 WHEN HL.`text` LIKE '%Utanför%' THEN 1 WHEN HL.`text` LIKE '%Skott_i_täcket%' THEN 1 ELSE 0 END) AS Målperavslut " +
             "FROM event_type HL JOIN game_event H ON H.event_type_id=HL.id " +
-            "JOIN player S ON S.id=H.player_id JOIN zone Z ON Z.id=H.zone_id WHERE H.game_id=@MatchID;";
+            "JOIN player S ON S.id=H.player_id JOIN zone Z ON Z.id=H.zone_id WHERE H.game_id=@MatchID AND S.position<>'SYS';";
         await using var connection = new MySqlConnection(ConnStr);
         await connection.OpenAsync();
         await using var cmd = new MySqlCommand(sql, connection);

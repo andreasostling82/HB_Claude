@@ -164,7 +164,9 @@
     // ---------- Rendering (offline-fältet + kö-listan + summering) ----------
 
     function fieldQueueForMatch(queue) {
-        return queue.filter(function (o) { return o.kind === 'event' && o.matchId === ctx.matchId; });
+        return queue.filter(function (o) {
+            return (o.kind === 'event' || o.kind === 'spelstopp') && o.matchId === ctx.matchId;
+        });
     }
 
     function renderBar(queue, state, msg) {
@@ -192,8 +194,9 @@
         var el = document.getElementById('mmQueueSummary');
         if (!el) return;
         if (!events.length) { el.innerHTML = ''; return; }
-        var goals = 0, shots = 0, faults = 0, saves = 0, mvGoals = 0;
+        var goals = 0, shots = 0, faults = 0, saves = 0, mvGoals = 0, stopp = 0;
         events.forEach(function (o) {
+            if (o.kind === 'spelstopp') { stopp++; return; }
             var f = o.flags || {};
             if (f.goal) goals++; if (f.shot) shots++; if (f.fault) faults++;
             if (f.save) saves++; if (f.mvGoal) mvGoals++;
@@ -202,7 +205,7 @@
         var raddPct = (mvGoals + saves) > 0 ? Math.round(saves / (mvGoals + saves) * 100) : 0;
         el.innerHTML = '<div class="alert alert-secondary py-1 mb-1 small">Preliminärt (offline) – '
             + 'Mål: ' + goals + ' - ' + mvGoals + '  Avslut: ' + shots + ' (' + avslutPct + '%)'
-            + '  Räddningar: ' + saves + ' (' + raddPct + '%)  Fel: ' + faults + '</div>';
+            + '  Räddningar: ' + saves + ' (' + raddPct + '%)  Fel: ' + faults + '  Spelstopp: ' + stopp + '</div>';
     }
 
     function renderQueue(queue) {
@@ -303,7 +306,7 @@
         var handler = handlerOf(e.submitter);
 
         // Byte av lag/match kräver servern – blockera offline med tydligt besked.
-        if (handler !== 'Händelse' && handler !== 'StartStop' && handler !== 'PausFortsatt') {
+        if (handler !== 'Händelse' && handler !== 'StartStop' && handler !== 'PausFortsatt' && handler !== 'Spelstopp') {
             e.preventDefault();
             showError('Byte av lag/match kräver internet. Det du redan valt fungerar offline.');
             return;
@@ -331,6 +334,13 @@
                 enqueue({ kind: 'status', matchId: ctx.matchId, status: 'Pågående' })
                     .then(function () { refresh(); });
             }
+            return;
+        }
+
+        if (handler === 'Spelstopp') {
+            // Spelstopp kräver ingen spelare – köa som matchhändelse.
+            enqueue({ kind: 'spelstopp', matchId: ctx.matchId, tids: seconds, label: 'Spelstopp' })
+                .then(function () { refresh(); });
             return;
         }
 

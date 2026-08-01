@@ -22,6 +22,11 @@ public class StatsModel : PageModel
     [BindProperty] public string ValtMatchID { get; set; } = "";
     [BindProperty] public string ValtSpelarID { get; set; } = "0";
 
+    // Spelstopp (matchhändelse utan spelare) och relaterade mål-totaler.
+    public int Spelstopp { get; set; }
+    public int MålGjorda { get; set; }
+    public int MålInsläppta { get; set; }
+
     private string UserId => HttpContext.Session.GetString("user") ?? "";
 
     public async Task<IActionResult> OnGetAsync()
@@ -96,6 +101,10 @@ public class StatsModel : PageModel
                 HändelserLista = allEvents;
                 SammanfattningLista = await _api.GetHandelseSamEJ_MV(ValtMatchID) ?? new();
                 MalvaktLista = await _api.GetMalvakt2(ValtMatchID) ?? new();
+
+                Spelstopp = await _api.GetSpelstoppCount(ValtMatchID);
+                MålGjorda = SammanfattningLista.Sum(s => int.TryParse(s.Mål, out var g) ? g : 0);
+                MålInsläppta = MalvaktLista.Sum(m => int.TryParse(m.Mål, out var g) ? g : 0);
             }
             else
             {

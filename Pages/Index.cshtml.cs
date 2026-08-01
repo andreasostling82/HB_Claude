@@ -38,17 +38,7 @@ public class IndexModel : PageModel
             return Page();
         }
 
-        var us = await _api.GetUser(Epost, Lösenord);
-        if (us == null)
-        {
-            var hash = ApiService.Hash256(Epost, Lösenord);
-            us = await _api.GetUserFromHash(hash);
-            if (us == null)
-            {
-                var serverHash = await _api.GetHash(Lösenord);
-                us = await _api.GetUserFromHash(serverHash.Trim('"'));
-            }
-        }
+        var us = await _api.AuthenticateUser(Epost, Lösenord);
 
         if (us == null)
         {

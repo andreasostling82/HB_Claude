@@ -27,6 +27,15 @@ public class User
     public string status { get; set; } = "";
 }
 
+public class KontoRad
+{
+    public string Epost { get; set; } = "";
+    public string Status { get; set; } = "";
+    public int AntalLag { get; set; }
+    public int AntalMatcher { get; set; }
+    public int Spelade { get; set; }
+}
+
 public class Lag
 {
     public string Namn { get; set; } = "";

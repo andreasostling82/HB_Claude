@@ -327,6 +327,34 @@ public class ApiService
         await SeedEvents(g3, p2);
     }
 
+    // ---- Admin / kontoöversikt ----
+
+    // Översikt över alla konton med antal lag, matcher och spelade (avslutade)
+    // matcher per konto. Används av admin-sidan för att följa aktiva konton.
+    public async Task<List<KontoRad>> GetKontoOversikt()
+    {
+        var list = new List<KontoRad>();
+        await using var connection = new MySqlConnection(ConnStr);
+        await connection.OpenAsync();
+        await using var cmd = new MySqlCommand(
+            "SELECT u.email, u.status, " +
+            "(SELECT COUNT(*) FROM team t WHERE t.user_id=u.id) AS antal_lag, " +
+            "(SELECT COUNT(*) FROM game g JOIN team t ON t.id=g.team_id WHERE t.user_id=u.id) AS antal_matcher, " +
+            "(SELECT COUNT(*) FROM game g JOIN team t ON t.id=g.team_id WHERE t.user_id=u.id AND g.status='Avslutad') AS spelade " +
+            "FROM app_user u ORDER BY antal_matcher DESC, antal_lag DESC, u.email;", connection);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            list.Add(new KontoRad
+            {
+                Epost = reader["email"].ToString() ?? "",
+                Status = reader["status"].ToString() ?? "",
+                AntalLag = Convert.ToInt32(reader["antal_lag"]),
+                AntalMatcher = Convert.ToInt32(reader["antal_matcher"]),
+                Spelade = Convert.ToInt32(reader["spelade"])
+            });
+        return list;
+    }
+
     // ---- Lag (Teams) ----
 
     private async Task<List<Lag>> GetTeams(string userId)
